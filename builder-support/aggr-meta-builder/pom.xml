@@ -3,6 +3,7 @@
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
     <artifactId>aggr-meta-builder</artifactId>
+    <version>1.0.1</version>
     <parent>
         <groupId>tools.cipm</groupId>
         <artifactId>builder-site</artifactId>
@@ -43,7 +44,7 @@
                                     <transitive>false</transitive>
                                 </artifact>
                                 <artifact>
-                                    <id>tools.cipm:tools.cipm.models.instrumentation:1.0.0</id>
+                                    <id>tools.cipm:tools.cipm.models.instrumentation:1.0.1</id>
                                     <transitive>false</transitive>
                                 </artifact>
                                 <artifact>
@@ -133,7 +134,7 @@
                                             <source>false</source>
                                         </artifact>
                                         <artifact>
-                                            <id>tools.cipm:tools.cipm.models.instrumentation:1.0.0</id>
+                                            <id>tools.cipm:tools.cipm.models.instrumentation:1.0.1</id>
                                             <transitive>false</transitive>
                                             <source>false</source>
                                         </artifact>
@@ -329,7 +330,7 @@
         <dependency>
             <groupId>tools.cipm</groupId>
             <artifactId>tools.cipm.models.instrumentation</artifactId>
-            <version>1.0.0</version>
+            <version>1.0.1</version>
         </dependency>
     </dependencies>
 </project>

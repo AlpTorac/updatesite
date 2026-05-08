@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<site>
+   <feature id="tools.cipm.metamodels.aggregated.feature">
+      <category name="tools.cipm.metamodels.aggregated"/>
+   </feature>
+   <category-def name="tools.cipm.metamodels.aggregated" label="Aggregated Metamodels for CIPM"/>
+</site>
