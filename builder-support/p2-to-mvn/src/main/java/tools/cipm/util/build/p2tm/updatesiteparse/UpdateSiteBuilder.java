@@ -92,8 +92,11 @@ public final class UpdateSiteBuilder {
 	private UpdateSiteBundle parseRemoteBundle(P2Bundle p2) throws IOException, InterruptedException {
 		String uri = p2.getUri("").toString();
 		Path tmp = downloadToTemp(uri);
+		return parseBundle(p2, tmp, true);
+	}
 
-		try (JarFile jar = new JarFile(tmp.toFile())) {
+	private static UpdateSiteBundle parseBundle(P2Bundle p2, Path jarPath, boolean deleteJARFile) {
+		try (JarFile jar = new JarFile(jarPath.toFile())) {
 			InputStream is = jar.getInputStream(jar.getJarEntry("META-INF/MANIFEST.MF"));
 			// ManifestElement.parseBundleManifest fills a Map<String,String> of
 			// raw header values (no localization; just raw OSGi headers).
@@ -103,9 +106,20 @@ public final class UpdateSiteBuilder {
 			List<UpdateSitePackageRequirement> imported = parseImportPackage(headers.get(OsgiHeaders.IMPORT_PACKAGE));
 			List<UpdateSitePackageRequirement> exported = parseExportPackage(headers.get(OsgiHeaders.EXPORT_PACKAGE));
 
-			return new UpdateSiteBundle(p2.getId(), p2.getVersion(), uri, required, imported, exported);
+			String symbolicName = resolveSymbolicName(headers, p2);
+
+			return new UpdateSiteBundle(symbolicName, p2.getVersion(), p2.getUri("").toString(), required, imported,
+					exported);
+		} catch (IOException e) {
+			throw new IllegalStateException(e);
 		} finally {
-			Files.deleteIfExists(tmp);
+			if (deleteJARFile) {
+				try {
+					Files.deleteIfExists(jarPath);
+				} catch (IOException e) {
+					throw new IllegalStateException(e);
+				}
+			}
 		}
 	}
 
@@ -119,18 +133,7 @@ public final class UpdateSiteBuilder {
 		// Derive the local file path from that URI.
 		URI jarUri = p2.getUri("");
 		Path jarPath = Paths.get(jarUri); // works for file:// URIs
-
-		try (JarFile jar = new JarFile(jarPath.toFile())) {
-			InputStream is = jar.getInputStream(jar.getJarEntry("META-INF/MANIFEST.MF"));
-
-			Map<String, String> headers = parseBundleManifest(is);
-
-			List<Dependency> required = parseRequireBundle(headers.get(OsgiHeaders.REQUIRE_BUNDLE));
-			List<UpdateSitePackageRequirement> imported = parseImportPackage(headers.get(OsgiHeaders.IMPORT_PACKAGE));
-			List<UpdateSitePackageRequirement> exported = parseExportPackage(headers.get(OsgiHeaders.EXPORT_PACKAGE));
-
-			return new UpdateSiteBundle(p2.getId(), p2.getVersion(), jarUri.toString(), required, imported, exported);
-		}
+		return parseBundle(p2, jarPath, false);
 	}
 
 	private static Map<String, String> parseBundleManifest(InputStream is) {
@@ -156,6 +159,35 @@ public final class UpdateSiteBuilder {
 	// ------------------------------------------------------------------
 	// OSGi manifest parsing via ManifestElement
 	// ------------------------------------------------------------------
+
+	/**
+	 * Resolves a bundle's symbolic name from its manifest's
+	 * {@code Bundle-SymbolicName} header, falling back to the repository id
+	 * ({@code p2.getId()}) when the manifest has no usable value.
+	 *
+	 * <p>
+	 * Some artifacts (e.g. plain non-OSGi jars such as
+	 * {@code org.pcm.headless.api}) have no {@code Bundle-SymbolicName} at all, in
+	 * which case the repository id is used. Any parameters after a {@code ';'}
+	 * (e.g. {@code ;singleton:=true}) are stripped.
+	 * </p>
+	 *
+	 * @param headers the parsed manifest headers
+	 * @param p2      the repository bundle entry
+	 * @return the resolved symbolic name (never null or blank)
+	 */
+	private static String resolveSymbolicName(Map<String, String> headers, P2Bundle p2) {
+		String bsn = headers.get(OsgiHeaders.BUNDLE_SYMBOLIC_NAME);
+		if (bsn != null) {
+			int semi = bsn.indexOf(';');
+			String clean = (semi == -1) ? bsn : bsn.substring(0, semi);
+			clean = clean.trim();
+			if (!clean.isEmpty()) {
+				return clean;
+			}
+		}
+		return p2.getId();
+	}
 
 	private static ManifestElement[] parseHeader(String header, String value) {
 		ManifestElement[] headers = null;
