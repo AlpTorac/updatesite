@@ -12,6 +12,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.jar.JarFile;
+import java.util.stream.Collectors;
 
 /**
  * Builds a flat, complete index of the ../mvn repository as a single list of
@@ -108,24 +109,21 @@ public final class MvnRepositoryIndex {
 
 		String fileName = jarPath.getFileName().toString();
 		String version = versionDir;
-		if (fileName.startsWith(artifactId + "-") && fileName.endsWith(".jar")) {
-			version = fileName.substring(artifactId.length() + 1, fileName.length() - ".jar".length());
+		if (fileName.startsWith(artifactId + "-") && fileName.endsWith(JAR_EXTENSION)) {
+			version = fileName.substring(artifactId.length() + 1, fileName.length() - JAR_EXTENSION.length());
 		}
 
 		// --- bundle name (manifest, or curated override, or artifactId fallback) ---
 		String bundleName = readBundleSymbolicName(jarPath)
 				.orElseGet(() -> ARTIFACT_TO_BUNDLE_NAME.getOrDefault(artifactId, artifactId));
 
-		// --- exported packages: one Coordinate per package ---
-		List<String> packages = readExportedPackages(jarPath);
-		if (packages.isEmpty()) {
-			// No Export-Package: fall back to a single Coordinate keyed by
-			// the bundle name / artifactId, so lookups by bundle still work.
-			return List.of(new Coordinate(groupId, artifactId, version, bundleName, bundleName));
-		}
-
 		List<Coordinate> result = new ArrayList<>();
-		for (String pkg : packages) {
+
+		// One Coordinate for the bundle itself
+		result.add(new Coordinate(groupId, artifactId, version, bundleName));
+
+		// --- exported packages: one Coordinate per package ---
+		for (String pkg : readExportedPackages(jarPath)) {
 			result.add(new Coordinate(groupId, artifactId, version, pkg, bundleName));
 		}
 		return result;
@@ -184,15 +182,19 @@ public final class MvnRepositoryIndex {
 		}
 	}
 
-	public static Optional<Coordinate> findByBundleName(String bundleName) {
-		return coordList.stream().filter(c -> c.bundleName.equals(bundleName)).findFirst();
+	public static List<Coordinate> findAllBundles() {
+		return coordList.stream().filter(c -> !c.hasPackage()).collect(Collectors.toList());
 	}
 
-	public static Optional<Coordinate> findByArtifactId(String artifactId) {
-		return coordList.stream().filter(c -> c.artifactId.equals(artifactId)).findFirst();
+	public static List<Coordinate> findByBundleName(String bundleName) {
+		return coordList.stream().filter(c -> c.bundleName.equals(bundleName)).collect(Collectors.toList());
 	}
 
-	public static Optional<Coordinate> findByPackage(List<Coordinate> coords, String packageName) {
-		return coords.stream().filter(c -> c.packageName.equals(packageName)).findFirst();
+	public static List<Coordinate> findByArtifactId(String artifactId) {
+		return coordList.stream().filter(c -> c.artifactId.equals(artifactId)).collect(Collectors.toList());
+	}
+
+	public static List<Coordinate> findByPackage(String packageName) {
+		return coordList.stream().filter(c -> c.packageName.equals(packageName)).collect(Collectors.toList());
 	}
 }

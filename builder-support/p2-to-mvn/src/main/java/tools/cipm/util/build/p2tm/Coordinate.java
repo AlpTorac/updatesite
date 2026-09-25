@@ -21,6 +21,7 @@ import java.util.Objects;
  * </p>
  */
 public final class Coordinate implements Comparable<Coordinate> {
+	public static final String DEFAULT_EXPORTED_PACKAGE_NAME = "";
 
 	/** The Maven group ID of the bundle that exports {@link #packageName}. */
 	public final String groupId;
@@ -42,26 +43,26 @@ public final class Coordinate implements Comparable<Coordinate> {
 	 */
 	public final String bundleName;
 
+	public Coordinate(String groupId, String artifactId, String version, String bundleName) {
+		this(groupId, artifactId, version, DEFAULT_EXPORTED_PACKAGE_NAME, bundleName);
+	}
+
 	/**
 	 * Creates a new {@code Coordinate}.
 	 *
 	 * @param groupId     the Maven group ID of the exporting bundle
 	 * @param artifactId  the Maven artifact ID of the exporting bundle
 	 * @param version     the Maven version of the exporting bundle
-	 * @param packageName the exported package; may be {@code null} when the bundle
-	 *                    exports no packages (in which case it defaults to the
-	 *                    bundle name)
+	 * @param packageName the exported package; may be empty string when the bundle
+	 *                    exports no packages
 	 * @param bundleName  the OSGi symbolic name of the exporting bundle
-	 * @throws NullPointerException if {@code groupId}, {@code artifactId},
-	 *                              {@code version}, or {@code bundleName} is
-	 *                              {@code null}
 	 */
 	public Coordinate(String groupId, String artifactId, String version, String packageName, String bundleName) {
 		this.groupId = Objects.requireNonNull(groupId, "groupId");
 		this.artifactId = Objects.requireNonNull(artifactId, "artifactId");
 		this.version = Objects.requireNonNull(version, "version");
 		// Null-safe: fall back to empty string when no package is exported.
-		this.packageName = (packageName == null || packageName.isBlank()) ? "" : packageName;
+		this.packageName = (packageName == null || packageName.isBlank()) ? DEFAULT_EXPORTED_PACKAGE_NAME : packageName;
 		this.bundleName = Objects.requireNonNull(bundleName, "bundleName");
 	}
 
@@ -76,9 +77,9 @@ public final class Coordinate implements Comparable<Coordinate> {
 	}
 
 	public boolean hasPackage() {
-		return !this.packageName.isBlank();
+		return !this.packageName.isBlank() && !this.packageName.equals(DEFAULT_EXPORTED_PACKAGE_NAME);
 	}
-	
+
 	/**
 	 * Compares coordinates by package name, then group, artifact, version and
 	 * finally bundle name. Since each coordinate represents one exported package,
@@ -150,7 +151,14 @@ public final class Coordinate implements Comparable<Coordinate> {
 	 */
 	@Override
 	public String toString() {
-		return packageName + "  <-  " + groupId + ":" + artifactId + ":" + version
-				+ (bundleName.equals(artifactId) ? "" : "  (bundle " + bundleName + ")");
+		StringBuilder sb = new StringBuilder();
+		if (hasPackage()) {
+			sb.append(packageName + "  <-  ");
+		}
+		sb.append(groupId + ":" + artifactId + ":" + version);
+		if (!bundleName.equals(artifactId)) {
+			sb.append("  (bundle " + bundleName + ")");
+		}
+		return sb.toString();
 	}
 }
