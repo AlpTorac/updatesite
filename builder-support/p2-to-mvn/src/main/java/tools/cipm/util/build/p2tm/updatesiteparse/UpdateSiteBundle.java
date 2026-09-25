@@ -1,33 +1,22 @@
 package tools.cipm.util.build.p2tm.updatesiteparse;
 
 import java.util.List;
+import java.util.Objects;
 
 /**
  * A single OSGi bundle from the update site, together with its accurately
  * parsed OSGi manifest information.
  */
 public final class UpdateSiteBundle {
-
-	/** The OSGi symbolic name (bundle name). */
 	public final String symbolicName;
-
-	/** The bundle's version. */
 	public final String version;
-
-	/** The download URI for the bundle's JAR. */
 	public final String uri;
-
-	/** The bundle's Require-Bundle entries (each with a name and version range). */
 	public final List<Dependency> requiredBundles;
-
-	/** The bundle's Import-Package entries. */
 	public final List<UpdateSitePackageRequirement> importedPackages;
-
-	/** The bundle's Export-Package entries. */
-	public final List<String> exportedPackages;
+	public final List<UpdateSitePackageRequirement> exportedPackages;
 
 	public UpdateSiteBundle(String symbolicName, String version, String uri, List<Dependency> requiredBundles,
-			List<UpdateSitePackageRequirement> importedPackages, List<String> exportedPackages) {
+			List<UpdateSitePackageRequirement> importedPackages, List<UpdateSitePackageRequirement> exportedPackages) {
 		this.symbolicName = symbolicName;
 		this.version = version;
 		this.uri = uri;

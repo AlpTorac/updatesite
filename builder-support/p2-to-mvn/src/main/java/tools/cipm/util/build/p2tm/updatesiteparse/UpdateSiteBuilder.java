@@ -37,7 +37,7 @@ public final class UpdateSiteBuilder {
 	private static final String REQUIRE_BUNDLE = "Require-Bundle";
 	private static final String JAR_EXTENSION = ".jar";
 
-	private static final String BUNDLE_SYMBOLIC_NAME = "Bundle-SymbolicName";
+//	private static final String BUNDLE_SYMBOLIC_NAME = "Bundle-SymbolicName";
 
 	private static final Logger logger = LoggerFactory.getLogger(UpdateSiteBuilder.class);
 
@@ -57,13 +57,13 @@ public final class UpdateSiteBuilder {
 		P2Repository repo = P2Repository.getInstance(URI.create(repositoryUri), logger);
 
 		Map<String, UpdateSiteBundle> bundlesByName = new LinkedHashMap<>();
-		Map<String, List<UpdateSiteBundle>> packagesToBundles = new LinkedHashMap<>();
+		Map<UpdateSitePackageRequirement, List<UpdateSiteBundle>> packagesToBundles = new LinkedHashMap<>();
 
 		for (P2Bundle p2 : repo.getBundles()) {
 			UpdateSiteBundle UpdateSiteBundle = parseRemoteBundle(p2);
 			bundlesByName.put(UpdateSiteBundle.symbolicName, UpdateSiteBundle);
 
-			for (String pkg : UpdateSiteBundle.exportedPackages) {
+			for (UpdateSitePackageRequirement pkg : UpdateSiteBundle.exportedPackages) {
 				packagesToBundles.computeIfAbsent(pkg, k -> new ArrayList<>()).add(UpdateSiteBundle);
 			}
 		}
@@ -83,12 +83,12 @@ public final class UpdateSiteBuilder {
 		P2Repository repo = P2Repository.getInstance(URI.create(repositoryUri), logger);
 
 		Map<String, UpdateSiteBundle> bundlesByName = new LinkedHashMap<>();
-		Map<String, List<UpdateSiteBundle>> packagesToBundles = new LinkedHashMap<>();
+		Map<UpdateSitePackageRequirement, List<UpdateSiteBundle>> packagesToBundles = new LinkedHashMap<>();
 
 		for (P2Bundle p2 : repo.getBundles()) {
 			UpdateSiteBundle bundle = parseLocalBundle(p2, localCloneRoot);
 			bundlesByName.put(bundle.symbolicName, bundle);
-			for (String pkg : bundle.exportedPackages) {
+			for (UpdateSitePackageRequirement pkg : bundle.exportedPackages) {
 				packagesToBundles.computeIfAbsent(pkg, k -> new ArrayList<>()).add(bundle);
 			}
 		}
@@ -108,7 +108,7 @@ public final class UpdateSiteBuilder {
 
 			List<Dependency> required = parseRequireBundle(headers.get(REQUIRE_BUNDLE));
 			List<UpdateSitePackageRequirement> imported = parseImportPackage(headers.get(IMPORT_PACKAGE));
-			List<String> exported = parseExportPackage(headers.get(EXPORT_PACKAGE));
+			List<UpdateSitePackageRequirement> exported = parseExportPackage(headers.get(EXPORT_PACKAGE));
 
 			return new UpdateSiteBundle(p2.getId(), p2.getVersion(), uri, required, imported, exported);
 		} finally {
@@ -134,7 +134,7 @@ public final class UpdateSiteBuilder {
 
 			List<Dependency> required = parseRequireBundle(headers.get(REQUIRE_BUNDLE));
 			List<UpdateSitePackageRequirement> imported = parseImportPackage(headers.get(IMPORT_PACKAGE));
-			List<String> exported = parseExportPackage(headers.get(EXPORT_PACKAGE));
+			List<UpdateSitePackageRequirement> exported = parseExportPackage(headers.get(EXPORT_PACKAGE));
 
 			return new UpdateSiteBundle(p2.getId(), p2.getVersion(), jarUri.toString(), required, imported, exported);
 		}
@@ -198,12 +198,16 @@ public final class UpdateSiteBuilder {
 		return result;
 	}
 
-	private static List<String> parseExportPackage(String value) {
-		List<String> result = new ArrayList<>();
+	private static List<UpdateSitePackageRequirement> parseExportPackage(String value) {
+		List<UpdateSitePackageRequirement> result = new ArrayList<>();
 		if (value == null)
 			return result;
 		for (ManifestElement el : parseHeader(EXPORT_PACKAGE, value)) {
-			result.add(el.getValue());
+			String version = el.getAttribute(VERSION);
+			// Export-Package uses uses:= and x-friends:= directives; for parity
+			// with imports we capture the version attribute. Exports are not
+			// "optional" in the same sense, so optional stays false.
+			result.add(new UpdateSitePackageRequirement(el.getValue(), version, false));
 		}
 		return result;
 	}

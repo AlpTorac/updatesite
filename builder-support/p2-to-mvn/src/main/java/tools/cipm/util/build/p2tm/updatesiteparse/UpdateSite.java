@@ -7,30 +7,31 @@ import java.util.Map;
  * Complete in-memory representation of an Eclipse p2 update site, built by
  * combining:
  * <ul>
- *   <li>{@code org.openntf.maven:p2-layout-resolver} — to enumerate bundles
- *       and their download locations, and</li>
- *   <li>{@code org.eclipse.osgi.util.ManifestElement} — to accurately parse
- *       each UpdateSiteBundle's OSGi manifest (Require-UpdateSiteBundle / Import-Package /
- *       Export-Package), and optionally
- *       {@code org.eclipse.equinox.p2} metadata for the resolved graph.</li>
+ * <li>{@code org.openntf.maven:p2-layout-resolver} — to enumerate bundles and
+ * their download locations, and</li>
+ * <li>{@code org.eclipse.osgi.util.ManifestElement} — to accurately parse each
+ * UpdateSiteBundle's OSGi manifest (Require-UpdateSiteBundle / Import-Package /
+ * Export-Package), and optionally {@code org.eclipse.equinox.p2} metadata for
+ * the resolved graph.</li>
  * </ul>
  */
 public final class UpdateSite {
 
-    /** The repository root (e.g. the p2 update-site URL). */
-    public final String repositoryUri;
+	/** The repository root (e.g. the p2 update-site URL). */
+	public final String repositoryUri;
 
-    /** Every OSGi UpdateSiteBundle in the update site, keyed by its symbolic name. */
-    public final Map<String, UpdateSiteBundle> bundlesByName;
+	/**
+	 * Every OSGi UpdateSiteBundle in the update site, keyed by its symbolic name.
+	 */
+	public final Map<String, UpdateSiteBundle> bundlesByName;
 
-    /** Every exported package -> the UpdateSiteBundle(s) that export it. */
-    public final Map<String, List<UpdateSiteBundle>> packagesToBundles;
+	/** Every exported package -> the UpdateSiteBundle(s) that export it. */
+	public final Map<UpdateSitePackageRequirement, List<UpdateSiteBundle>> packagesToBundles;
 
-    public UpdateSite(String repositoryUri,
-                       Map<String, UpdateSiteBundle> bundlesByName,
-                       Map<String, List<UpdateSiteBundle>> packagesToBundles) {
-        this.repositoryUri = repositoryUri;
-        this.bundlesByName = Map.copyOf(bundlesByName);
-        this.packagesToBundles = packagesToBundles;
-    }
+	public UpdateSite(String repositoryUri, Map<String, UpdateSiteBundle> bundlesByName,
+			Map<UpdateSitePackageRequirement, List<UpdateSiteBundle>> packagesToBundles) {
+		this.repositoryUri = repositoryUri;
+		this.bundlesByName = Map.copyOf(bundlesByName);
+		this.packagesToBundles = packagesToBundles;
+	}
 }
