@@ -3,8 +3,12 @@ package tools.cipm.util.build.p2tm;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.jar.JarFile;
@@ -15,29 +19,30 @@ import java.util.jar.JarFile;
  * need for multiple overlapping index maps.
  */
 public final class MvnRepositoryIndex {
+	private static final String EXPORT_PACKAGE = "Export-Package";
 	private static final String REQUIRE_BUNDLE = "Require-Bundle";
 	private static final String BUNDLE_SYMBOLIC_NAME = "Bundle-SymbolicName";
 	private static final String JAR_EXTENSION = ".jar";
 
-//    /**
-//     * Only for artifacts whose "bundle name" is a repository convention and not
-//     * discoverable from the artifact itself (e.g. plain non-OSGi jars that have no
-//     * Bundle-SymbolicName in the manifest). Keyed by Maven artifactId.
-//     */
-//    private static final Map<String, String> ARTIFACT_TO_BUNDLE_NAME = new LinkedHashMap<>();
-//    static {
-//         ARTIFACT_TO_BUNDLE_NAME.put("api", "org.pcm.headless.api");
-//    }
-//
-//    /**
-//     * Bundles provided by the runtime / target platform that need no Maven
-//     * declaration. Curate per deployment (e.g. the OSGi framework).
-//     */
-//    private static final Set<String> PROVIDED_BUNDLES = new HashSet<>();
-//    static {
-//         PROVIDED_BUNDLES.add("org.eclipse.osgi");
-//         PROVIDED_BUNDLES.add("org.osgi.framework");
-//    }
+	/**
+	 * Only for artifacts whose "bundle name" is a repository convention and not
+	 * discoverable from the artifact itself (e.g. plain non-OSGi jars that have no
+	 * Bundle-SymbolicName in the manifest). Keyed by Maven artifactId.
+	 */
+	private static final Map<String, String> ARTIFACT_TO_BUNDLE_NAME = new LinkedHashMap<>();
+	static {
+		ARTIFACT_TO_BUNDLE_NAME.put("api", "org.pcm.headless.api");
+	}
+
+	/**
+	 * Bundles provided by the runtime / target platform that need no Maven
+	 * declaration. Curate per deployment (e.g. the OSGi framework).
+	 */
+	private static final Set<String> PROVIDED_BUNDLES = new HashSet<>();
+	static {
+		PROVIDED_BUNDLES.add("org.eclipse.osgi");
+		PROVIDED_BUNDLES.add("org.osgi.framework");
+	}
 
 	private static Set<Coordinate> coordList;
 
@@ -71,12 +76,7 @@ public final class MvnRepositoryIndex {
 
 		try (var stream = Files.walk(repoRoot)) {
 			stream.filter(Files::isRegularFile).filter(path -> path.getFileName().toString().endsWith(JAR_EXTENSION))
-					.forEach(jarPath -> {
-						Coordinate coord = coordinateFor(jarPath, repoRoot, repoRootDepth);
-						if (coord != null) {
-							coordinates.add(coord);
-						}
-					});
+					.forEach(jarPath -> coordinates.addAll(coordinatesFor(jarPath, repoRoot, repoRootDepth)));
 		} catch (IOException e) {
 			e.printStackTrace();
 			throw new IllegalStateException(e);
@@ -90,32 +90,77 @@ public final class MvnRepositoryIndex {
 	 * Derives groupId, artifactId, version and bundle name from a single jar's
 	 * repository path and manifest.
 	 */
-	private static Coordinate coordinateFor(Path jarPath, Path repoRoot, int repoRootDepth) {
-		Path artifactDir = jarPath.getParent(); // .../<groupId>/<artifactId>/<version>
-		if (artifactDir == null) {
-			return null;
-		}
-		String versionDir = artifactDir.getFileName().toString();
-		Path artifactIdDir = artifactDir.getParent(); // .../<groupId>/<artifactId>
-		Path groupPath = artifactIdDir == null ? null : artifactIdDir.getParent(); // .../<groupId>
+	private static List<Coordinate> coordinatesFor(Path jarPath, Path repoRoot, int repoRootDepth) {
+		// --- derive the shared Maven identity (unchanged from before) ---
+		Path artifactDir = jarPath.getParent();
+		if (artifactDir == null)
+			return List.of();
 
+		String versionDir = artifactDir.getFileName().toString();
+		Path artifactIdDir = artifactDir.getParent();
+		Path groupPath = artifactIdDir == null ? null : artifactIdDir.getParent();
 		if (artifactIdDir == null || groupPath == null || groupPath.getNameCount() < repoRootDepth) {
-			return null; // malformed layout, skip
+			return List.of();
 		}
 
 		String artifactId = artifactIdDir.getFileName().toString();
 		String groupId = repoRoot.relativize(groupPath).toString().replace('/', '.');
 
-		// The filename's version is more reliable than trusting the directory name.
-		String fileName = jarPath.getFileName().toString(); // <artifactId>-<version>.jar
+		String fileName = jarPath.getFileName().toString();
 		String version = versionDir;
-		if (fileName.startsWith(artifactId + "-") && fileName.endsWith(JAR_EXTENSION)) {
-			version = fileName.substring(artifactId.length() + 1, fileName.length() - JAR_EXTENSION.length());
+		if (fileName.startsWith(artifactId + "-") && fileName.endsWith(".jar")) {
+			version = fileName.substring(artifactId.length() + 1, fileName.length() - ".jar".length());
 		}
 
-		String bundleName = readBundleSymbolicName(jarPath).orElse(artifactId);
+		// --- bundle name (manifest, or curated override, or artifactId fallback) ---
+		String bundleName = readBundleSymbolicName(jarPath)
+				.orElseGet(() -> ARTIFACT_TO_BUNDLE_NAME.getOrDefault(artifactId, artifactId));
 
-		return new Coordinate(groupId, artifactId, version, bundleName);
+		// --- exported packages: one Coordinate per package ---
+		List<String> packages = readExportedPackages(jarPath);
+		if (packages.isEmpty()) {
+			// No Export-Package: fall back to a single Coordinate keyed by
+			// the bundle name / artifactId, so lookups by bundle still work.
+			return List.of(new Coordinate(groupId, artifactId, version, bundleName, bundleName));
+		}
+
+		List<Coordinate> result = new ArrayList<>();
+		for (String pkg : packages) {
+			result.add(new Coordinate(groupId, artifactId, version, pkg, bundleName));
+		}
+		return result;
+	}
+
+	/**
+	 * Reads the Export-Package manifest header and returns the plain package names
+	 * (dropping anything after the first ';', trimming whitespace, skipping
+	 * blanks).
+	 */
+	private static List<String> readExportedPackages(Path jarPath) {
+		try (JarFile jar = new JarFile(jarPath.toFile())) {
+			var manifest = jar.getManifest();
+			if (manifest == null)
+				return List.of();
+
+			String exportPackages = manifest.getMainAttributes().getValue(EXPORT_PACKAGE);
+			if (exportPackages == null || exportPackages.isBlank())
+				return List.of();
+
+			List<String> result = new ArrayList<>();
+			for (String entry : exportPackages.split(",")) {
+				String clean = entry.trim();
+				if (clean.isEmpty())
+					continue;
+				int semi = clean.indexOf(';');
+				String pkg = (semi == -1) ? clean : clean.substring(0, semi).trim();
+				if (!pkg.isEmpty()) {
+					result.add(pkg);
+				}
+			}
+			return result;
+		} catch (IOException e) {
+			return List.of();
+		}
 	}
 
 	/**
@@ -145,5 +190,9 @@ public final class MvnRepositoryIndex {
 
 	public static Optional<Coordinate> findByArtifactId(String artifactId) {
 		return coordList.stream().filter(c -> c.artifactId.equals(artifactId)).findFirst();
+	}
+
+	public static Optional<Coordinate> findByPackage(List<Coordinate> coords, String packageName) {
+		return coords.stream().filter(c -> c.packageName.equals(packageName)).findFirst();
 	}
 }
