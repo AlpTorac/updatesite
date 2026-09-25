@@ -28,13 +28,6 @@ import org.slf4j.LoggerFactory;
  * (accurate manifest parsing).
  */
 public final class UpdateSiteBuilder {
-	private static final String RESOLUTION = "resolution";
-	private static final String VERSION = "version";
-	private static final String OPTIONAL = "optional";
-	private static final String BUNDLE_VERSION = "Bundle-version";
-	private static final String IMPORT_PACKAGE = "Import-Package";
-	private static final String EXPORT_PACKAGE = "Export-Package";
-	private static final String REQUIRE_BUNDLE = "Require-Bundle";
 	private static final String JAR_EXTENSION = ".jar";
 
 //	private static final String BUNDLE_SYMBOLIC_NAME = "Bundle-SymbolicName";
@@ -106,9 +99,9 @@ public final class UpdateSiteBuilder {
 			// raw header values (no localization; just raw OSGi headers).
 			Map<String, String> headers = parseBundleManifest(is);
 
-			List<Dependency> required = parseRequireBundle(headers.get(REQUIRE_BUNDLE));
-			List<UpdateSitePackageRequirement> imported = parseImportPackage(headers.get(IMPORT_PACKAGE));
-			List<UpdateSitePackageRequirement> exported = parseExportPackage(headers.get(EXPORT_PACKAGE));
+			List<Dependency> required = parseRequireBundle(headers.get(OsgiHeaders.REQUIRE_BUNDLE));
+			List<UpdateSitePackageRequirement> imported = parseImportPackage(headers.get(OsgiHeaders.IMPORT_PACKAGE));
+			List<UpdateSitePackageRequirement> exported = parseExportPackage(headers.get(OsgiHeaders.EXPORT_PACKAGE));
 
 			return new UpdateSiteBundle(p2.getId(), p2.getVersion(), uri, required, imported, exported);
 		} finally {
@@ -132,9 +125,9 @@ public final class UpdateSiteBuilder {
 
 			Map<String, String> headers = parseBundleManifest(is);
 
-			List<Dependency> required = parseRequireBundle(headers.get(REQUIRE_BUNDLE));
-			List<UpdateSitePackageRequirement> imported = parseImportPackage(headers.get(IMPORT_PACKAGE));
-			List<UpdateSitePackageRequirement> exported = parseExportPackage(headers.get(EXPORT_PACKAGE));
+			List<Dependency> required = parseRequireBundle(headers.get(OsgiHeaders.REQUIRE_BUNDLE));
+			List<UpdateSitePackageRequirement> imported = parseImportPackage(headers.get(OsgiHeaders.IMPORT_PACKAGE));
+			List<UpdateSitePackageRequirement> exported = parseExportPackage(headers.get(OsgiHeaders.EXPORT_PACKAGE));
 
 			return new UpdateSiteBundle(p2.getId(), p2.getVersion(), jarUri.toString(), required, imported, exported);
 		}
@@ -167,7 +160,7 @@ public final class UpdateSiteBuilder {
 	private static ManifestElement[] parseHeader(String header, String value) {
 		ManifestElement[] headers = null;
 		try {
-			headers = ManifestElement.parseHeader(REQUIRE_BUNDLE, value);
+			headers = ManifestElement.parseHeader(OsgiHeaders.REQUIRE_BUNDLE, value);
 		} catch (BundleException e) {
 			throw new IllegalStateException(e);
 		}
@@ -178,9 +171,9 @@ public final class UpdateSiteBuilder {
 		List<Dependency> result = new ArrayList<>();
 		if (value == null)
 			return result;
-		for (ManifestElement el : parseHeader(REQUIRE_BUNDLE, value)) {
+		for (ManifestElement el : parseHeader(OsgiHeaders.REQUIRE_BUNDLE, value)) {
 			String name = el.getValue();
-			String version = el.getAttribute(BUNDLE_VERSION);
+			String version = el.getAttribute(OsgiHeaders.BUNDLE_VERSION);
 			result.add(new Dependency(name, version == null ? "" : version));
 		}
 		return result;
@@ -190,9 +183,9 @@ public final class UpdateSiteBuilder {
 		List<UpdateSitePackageRequirement> result = new ArrayList<>();
 		if (value == null)
 			return result;
-		for (ManifestElement el : parseHeader(IMPORT_PACKAGE, value)) {
-			String version = el.getAttribute(VERSION);
-			boolean optional = OPTIONAL.equals(el.getDirective(RESOLUTION));
+		for (ManifestElement el : parseHeader(OsgiHeaders.IMPORT_PACKAGE, value)) {
+			String version = el.getAttribute(OsgiHeaders.VERSION);
+			boolean optional = OsgiHeaders.OPTIONAL.equals(el.getDirective(OsgiHeaders.RESOLUTION));
 			result.add(new UpdateSitePackageRequirement(el.getValue(), version, optional));
 		}
 		return result;
@@ -202,8 +195,8 @@ public final class UpdateSiteBuilder {
 		List<UpdateSitePackageRequirement> result = new ArrayList<>();
 		if (value == null)
 			return result;
-		for (ManifestElement el : parseHeader(EXPORT_PACKAGE, value)) {
-			String version = el.getAttribute(VERSION);
+		for (ManifestElement el : parseHeader(OsgiHeaders.EXPORT_PACKAGE, value)) {
+			String version = el.getAttribute(OsgiHeaders.VERSION);
 			// Export-Package uses uses:= and x-friends:= directives; for parity
 			// with imports we capture the version attribute. Exports are not
 			// "optional" in the same sense, so optional stays false.
