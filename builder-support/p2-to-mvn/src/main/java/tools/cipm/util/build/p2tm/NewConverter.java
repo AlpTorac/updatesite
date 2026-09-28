@@ -1,4 +1,4 @@
-package tools.cipm.util.build.p2tm.mvnosgimap;
+package tools.cipm.util.build.p2tm;
 
 import java.io.File;
 import java.io.IOException;
@@ -15,6 +15,9 @@ import java.util.Scanner;
 import org.openntf.maven.p2.model.P2Repository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import tools.cipm.util.build.p2tm.mvnosgimap.Coordinate;
+import tools.cipm.util.build.p2tm.mvnosgimap.MvnRepositoryIndex;
 
 public class NewConverter {
 	private static final Logger logger = LoggerFactory.getLogger(NewConverter.class);
