@@ -5,6 +5,9 @@ import java.util.stream.Collectors;
 
 import org.junit.jupiter.api.Test;
 
+import tools.cipm.util.build.p2tm.mvnosgimap.MvnRepositoryIndex;
+import tools.cipm.util.build.p2tm.mvnosgimap.NewConverter;
+
 public class MavenTest {
 	@Test
 	public void test() {

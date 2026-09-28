@@ -1,4 +1,4 @@
-package tools.cipm.util.build.p2tm;
+package tools.cipm.util.build.p2tm.mvnosgimap;
 
 import java.io.File;
 import java.io.IOException;
