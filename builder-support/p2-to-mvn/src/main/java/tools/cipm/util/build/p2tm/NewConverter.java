@@ -1,18 +1,18 @@
 package tools.cipm.util.build.p2tm;
 
+import java.io.File;
 import java.io.IOException;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse.BodyHandlers;
 import java.nio.file.Files;
-import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.HashSet;
 import java.util.List;
-import java.util.Map;
 import java.util.Scanner;
+import java.util.Set;
 
-import org.openntf.maven.p2.model.P2Bundle;
 import org.openntf.maven.p2.model.P2Repository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -23,18 +23,12 @@ import tools.cipm.util.build.p2tm.updatesiteparse.UpdateSite;
 import tools.cipm.util.build.p2tm.updatesiteparse.UpdateSiteBuilder;
 import tools.cipm.util.build.p2tm.updatesiteparse.UpdateSiteBundle;
 
-/**
- * Converts a p2 update site into a Maven repository (../mvn). For each bundle
- * this generates a POM that declares its transitive dependencies (derived from
- * the bundle's OSGi requirements and resolved against the existing Maven
- * repository), so downstream Maven builds resolve them automatically.
- */
 public class NewConverter {
 	private static final Logger logger = LoggerFactory.getLogger(NewConverter.class);
 	private static final String JAR_FILE_EXTENSION = ".jar";
-
-	// Optional fallback group mapping for bundles not yet in ../mvn.
-	private static final Map<String, String> BUNDLE_TO_GROUP = Map.of();
+	private static final String URI_FILE_PREFIX = "file://";
+	private static final String URI_HTTP_SCHEME = "http";
+	private static final String URI_HTTPS_SCHEME = "https";
 
 	public static void main(String[] args) {
 		// installJarsFromLocalDirectory();
@@ -56,19 +50,21 @@ public class NewConverter {
 				if (!fileName.endsWith(JAR_FILE_EXTENSION)) {
 					return;
 				}
+
 				var fileNameParts = fileName.split("_");
+
 				System.out.println("You need to specify a group ID for the artifact " + fileName
-						+ ". Please enter it. Leave the ID empty if the last group ID " + lastGroupIdContainer
-						+ " should be reused.");
+						+ ". Please enter it. Leave the ID empty if the last group ID "
+						+ lastGroupIdContainer.toString() + " should be reused.");
 				var potentialGroupId = scanner.next();
 				if (!potentialGroupId.isBlank()) {
-					lastGroupIdContainer.setLength(0);
+					lastGroupIdContainer.delete(0, lastGroupIdContainer.length());
 					lastGroupIdContainer.append(potentialGroupId);
 				}
+
 				try {
 					installJarLocally(path.toString(), lastGroupIdContainer.toString(), fileNameParts[0],
-							fileNameParts[1].substring(0, fileNameParts[1].length() - JAR_FILE_EXTENSION.length()),
-							List.of());
+							fileNameParts[1].substring(0, fileNameParts[1].length() - JAR_FILE_EXTENSION.length()));
 				} catch (IOException | InterruptedException e) {
 					System.out.println("Could not process " + fileName);
 				}
@@ -85,6 +81,7 @@ public class NewConverter {
 			System.out.println("No Id or URI given. Stopping.");
 			return;
 		}
+
 		installJarsFromRepository(id, repoUri, false);
 	}
 
@@ -92,69 +89,75 @@ public class NewConverter {
 		P2Repository p2Repo = P2Repository.getInstance(URI.create(repoUri), logger);
 		var allBundles = p2Repo.getBundles();
 
-		// Parse the update site into an in-memory model.
-		UpdateSite updateSite;
-		try {
-			updateSite = new UpdateSiteBuilder().buildLocal(localRootFromUri(repoUri));
-		} catch (IOException e) {
-			throw new RuntimeException("Could not parse update site", e);
-		}
-
-		// Index the existing Maven repository.
-		MvnRepositoryIndex.build(Paths.get("..", "mvn"));
-
-		TransitiveDependencyResolver resolver = new TransitiveDependencyResolver();
-
 		HttpClient client = HttpClient.newHttpClient();
-		for (P2Bundle p2 : allBundles) {
-			System.out.println("Downloading " + p2.getId());
+		for (var bundle : allBundles) {
+			System.out.println("Downloading " + bundle.getId());
+
 			try {
-				Path jarPath;
 				if (isLocal) {
-					jarPath = Paths.get(p2.getUri(""));
-					if (!Files.exists(jarPath)) {
-						continue;
+					var bundleUri = bundle.getUri("");
+					if (!URI_HTTP_SCHEME.equals(bundleUri.getScheme())
+							&& !URI_HTTPS_SCHEME.equals(bundleUri.getScheme()) && Files.exists(Paths.get(bundleUri))) {
+						installJarLocally(bundleUri.getSchemeSpecificPart(), id, bundle.getId(), bundle.getVersion());
 					}
-				} else {
-					jarPath = Paths.get("target", p2.getId() + "_" + p2.getVersion() + ".jar");
-					if (Files.notExists(jarPath)) {
-						client.send(HttpRequest.newBuilder(p2.getUri("")).GET().build(), BodyHandlers.ofFile(jarPath));
-					}
+					continue;
 				}
 
-				UpdateSiteBundle bundle = updateSite.bundlesByName.get(p2.getId());
-				List<Coordinate> deps = bundle != null ? resolver.resolve(bundle) : List.of();
+				var tempStorageFile = Paths.get("target", bundle.getId() + "_" + bundle.getVersion() + ".jar");
 
-				installJarLocally(jarPath.toString(), id, p2.getId(), p2.getVersion(), deps);
-
-				if (!isLocal) {
-					Files.delete(jarPath);
+				if (Files.notExists(tempStorageFile)) {
+					var bodyHandler = BodyHandlers.ofFile(tempStorageFile);
+					client.send(HttpRequest.newBuilder(bundle.getUri("")).GET().build(), bodyHandler);
 				}
+
+				installJarLocally(tempStorageFile.toString(), id, bundle.getId(), bundle.getVersion());
+
+				Files.delete(tempStorageFile);
 			} catch (IOException | InterruptedException e) {
 				e.printStackTrace();
 			}
 		}
 	}
 
-	private static String localRootFromUri(String repoUri) {
-		if (repoUri.startsWith("file:")) {
-			return repoUri.substring("file:".length());
-		}
-		return repoUri;
+	private static void installJarLocally(String filePath, String groupId, String artifactId, String version)
+			throws IOException, InterruptedException {
+		// Only supports Linux for now.
+		var subProcess = new ProcessBuilder("./mvnw", "install:install-file", "-DlocalRepositoryPath=../mvn",
+				"-Dfile=" + filePath, "-DgroupId=" + groupId, "-DartifactId=" + artifactId, "-Dversion=" + version,
+				"-Dpackaging=jar", "-DcreateChecksum=true").inheritIO().start();
+		var subProcessResult = subProcess.waitFor();
+		System.out.println(subProcessResult);
 	}
 
-	private static void installJarLocally(String filePath, String groupId, String artifactId, String version,
-			List<Coordinate> dependencies) throws IOException, InterruptedException {
-		Path pomFile = PomWriter.write(groupId, artifactId, version, dependencies);
+	private static String getTransitiveDependencyPOMString() {
+		var mvnDirPath = new File("../../mvn").toPath();
+		var repoPath = new File("/home/sdqstud1/CIPM-Updatesite/archive/cipm-0.1.1").getAbsoluteFile().toPath()
+				.toAbsolutePath();
 
+		// Build the Maven Repository Index
+		MvnRepositoryIndex.build(mvnDirPath);
+
+		// Parse the update site into an in-memory model.
+		UpdateSite updateSite;
 		try {
-			var subProcess = new ProcessBuilder("./mvnw", "install:install-file", "-DlocalRepositoryPath=../mvn",
-					"-Dfile=" + filePath, "-DgroupId=" + groupId, "-DartifactId=" + artifactId, "-Dversion=" + version,
-					"-Dpackaging=jar", "-DcreateChecksum=true", "-DpomFile=" + pomFile).inheritIO().start();
-			var result = subProcess.waitFor();
-			System.out.println(result);
-		} finally {
-			Files.deleteIfExists(pomFile);
+			updateSite = new UpdateSiteBuilder().buildLocal(repoPath.toString());
+		} catch (IOException e) {
+			throw new RuntimeException("Could not parse update site", e);
 		}
+
+		P2Repository p2Repo = P2Repository.getInstance(URI.create(updateSite.repositoryUri), logger);
+		var allBundles = p2Repo.getBundles();
+
+		TransitiveDependencyResolver resolver = new TransitiveDependencyResolver();
+
+		Set<Coordinate> allTransitiveDeps = new HashSet<>();
+
+		for (var p2 : allBundles) {
+			UpdateSiteBundle bundle = updateSite.bundlesByName.get(p2.getId());
+			List<Coordinate> transitiveDepsForBundle = bundle != null ? resolver.resolve(bundle) : List.of();
+			allTransitiveDeps.addAll(transitiveDepsForBundle);
+		}
+
+		return PomWriter.render("abc", "def", "v0.0.0", allTransitiveDeps);
 	}
 }
