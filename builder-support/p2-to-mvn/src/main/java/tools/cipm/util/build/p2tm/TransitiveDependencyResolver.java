@@ -58,6 +58,10 @@ public final class TransitiveDependencyResolver {
 				// Attempt to find the coordinate with the exact version first. If there is no
 				// such coordinate, just return the first coordinate found.
 				//
+				// FIXME May require adjustments as multiple versions for the required
+				// dependencies are introduced and conflicts between the individual versions
+				// arise.
+				//
 				coord = coords.stream().filter(c -> required.getVersionRange().inRange(c.version)).findFirst()
 						.orElse(coords.stream().findFirst().get());
 				result.add(coord);
