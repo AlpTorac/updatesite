@@ -9,13 +9,11 @@ import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import java.util.Set;
-import java.util.jar.JarFile;
 import java.util.stream.Collectors;
 
 import tools.cipm.util.build.p2tm.FileConstants;
-import tools.cipm.util.build.p2tm.OsgiHeaders;
+import tools.cipm.util.build.p2tm.ManifestReader;
 
 /**
  * Builds a flat, complete index of the local Maven repository as a single list
@@ -117,7 +115,8 @@ public final class MvnRepositoryIndex {
 		}
 
 		// --- bundle name (manifest, or curated override, or artifactId fallback) ---
-		String bundleName = readBundleSymbolicName(jarPath)
+		var manifestHeaders = ManifestReader.readManifest(jarPath);
+		String bundleName = ManifestReader.readBundleSymbolicName(manifestHeaders)
 				.orElseGet(() -> ARTIFACT_TO_BUNDLE_NAME.getOrDefault(artifactId, artifactId));
 
 		List<Coordinate> result = new ArrayList<>();
@@ -126,73 +125,10 @@ public final class MvnRepositoryIndex {
 		result.add(new Coordinate(groupId, artifactId, version, bundleName));
 
 		// One Coordinate per exported package
-		for (String pkg : readExportedPackages(jarPath)) {
+		for (String pkg : ManifestReader.readExportedPackageNames(manifestHeaders)) {
 			result.add(new Coordinate(groupId, artifactId, version, pkg, bundleName));
 		}
 		return result;
-	}
-
-	/**
-	 * Reads the Export-Package manifest header and returns the plain package names
-	 * (dropping anything after the first ';', trimming whitespace, skipping
-	 * blanks).
-	 * 
-	 * @param jarPath The path to the JAR file
-	 * 
-	 * @return The list of all exported packages under the manifest file of the
-	 *         given JAR file (at jarPath).
-	 */
-	private static List<String> readExportedPackages(Path jarPath) {
-		try (JarFile jar = new JarFile(jarPath.toFile())) {
-			var manifest = jar.getManifest();
-			if (manifest == null)
-				return List.of();
-
-			String exportPackages = manifest.getMainAttributes().getValue(OsgiHeaders.EXPORT_PACKAGE);
-			if (exportPackages == null || exportPackages.isBlank())
-				return List.of();
-
-			List<String> result = new ArrayList<>();
-			for (String entry : exportPackages.split(",")) {
-				String clean = entry.trim();
-				if (clean.isEmpty())
-					continue;
-				int semi = clean.indexOf(';');
-				String pkg = (semi == -1) ? clean : clean.substring(0, semi).trim();
-				if (!pkg.isEmpty()) {
-					result.add(pkg);
-				}
-			}
-			return result;
-		} catch (IOException e) {
-			return List.of();
-		}
-	}
-
-	/**
-	 * Reads the OSGi Bundle-SymbolicName from a jar's manifest, dropping any
-	 * parameters after ';'.
-	 * 
-	 * @param jarPath The path to the JAR file
-	 * 
-	 * @return The symbolic bundle name in the manifest file of the given JAR file
-	 *         (at jarPath).
-	 */
-	private static Optional<String> readBundleSymbolicName(Path jarPath) {
-		try (JarFile jar = new JarFile(jarPath.toFile())) {
-			var manifest = jar.getManifest();
-			if (manifest == null) {
-				return Optional.empty();
-			}
-			String bsn = manifest.getMainAttributes().getValue(OsgiHeaders.BUNDLE_SYMBOLIC_NAME);
-			if (bsn == null || bsn.isBlank()) {
-				return Optional.empty();
-			}
-			int semi = bsn.indexOf(';');
-			return Optional.of((semi == -1) ? bsn : bsn.substring(0, semi));
-		} catch (IOException e) {
-			return Optional.empty();
-		}
 	}
 
 	/**
