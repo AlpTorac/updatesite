@@ -105,7 +105,7 @@ public final class UpdateSiteBuilder {
 			// deleting the locally cloned JAR files after exceptions
 			Map<String, String> headers = ManifestReader.readManifest(is);
 
-			List<Dependency> required = ManifestReader.readRequiredBundles(headers);
+			List<BundleDependency> required = ManifestReader.readRequiredBundles(headers);
 			List<UpdateSitePackage> imported = ManifestReader.readImportedPackages(headers);
 			List<UpdateSitePackage> exported = ManifestReader.readExportedPackages(headers);
 

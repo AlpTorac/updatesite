@@ -14,7 +14,7 @@ import java.util.jar.JarFile;
 import org.eclipse.osgi.util.ManifestElement;
 import org.osgi.framework.BundleException;
 
-import tools.cipm.util.build.p2tm.updatesiteparse.Dependency;
+import tools.cipm.util.build.p2tm.updatesiteparse.BundleDependency;
 import tools.cipm.util.build.p2tm.updatesiteparse.UpdateSitePackage;
 
 /**
@@ -87,27 +87,25 @@ public final class ManifestReader {
 	}
 
 	/**
-	 * Parses the {@code Require-Bundle} header into {@link Dependency}s.
+	 * Parses the {@code Require-Bundle} header into {@link BundleDependency}s.
 	 *
 	 * @param manifest the parsed manifest headers
 	 * @return the list of required-bundle dependencies (never null)
 	 */
-	public static List<Dependency> readRequiredBundles(Map<String, String> manifest) {
+	public static List<BundleDependency> readRequiredBundles(Map<String, String> manifest) {
 		String value = manifest.get(OsgiHeaders.REQUIRE_BUNDLE);
 		if (value == null || value.isBlank()) {
 			return List.of();
 		}
-		List<Dependency> result = new ArrayList<>();
+		List<BundleDependency> result = new ArrayList<>();
 		for (ManifestElement el : parseHeader(OsgiHeaders.REQUIRE_BUNDLE, value)) {
-			String version = el.getAttribute(OsgiHeaders.BUNDLE_VERSION);
-			result.add(new Dependency(el.getValue(), version));
+			result.add(parseBundleDependency(el));
 		}
 		return result;
 	}
 
 	/**
-	 * Parses the {@code Import-Package} header into
-	 * {@link UpdateSitePackage}s.
+	 * Parses the {@code Import-Package} header into {@link UpdateSitePackage}s.
 	 *
 	 * @param manifest the parsed manifest headers
 	 * @return the list of imported-package requirements (never null)
@@ -125,8 +123,7 @@ public final class ManifestReader {
 	}
 
 	/**
-	 * Parses the {@code Export-Package} header into
-	 * {@link UpdateSitePackage}s.
+	 * Parses the {@code Export-Package} header into {@link UpdateSitePackage}s.
 	 *
 	 * <p>
 	 * Exports are not "optional" in the same sense as imports, so {@code optional}
@@ -153,6 +150,13 @@ public final class ManifestReader {
 		var attributes = collectAttributes(el);
 		var directives = collectDirectives(el);
 		return new UpdateSitePackage(packageName, attributes, directives);
+	}
+
+	private static BundleDependency parseBundleDependency(ManifestElement el) {
+		var bundleName = el.getValue();
+		var attributes = collectAttributes(el);
+		var directives = collectDirectives(el);
+		return new BundleDependency(bundleName, attributes, directives);
 	}
 
 	/**
