@@ -12,7 +12,6 @@ import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 
-import tools.cipm.util.build.p2tm.BundleSymbolicNameData;
 import tools.cipm.util.build.p2tm.FileConstants;
 import tools.cipm.util.build.p2tm.ManifestReader;
 

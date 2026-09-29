@@ -31,7 +31,7 @@ public class BundleDependency extends InMemoryManifestElementRepresentation {
 	 */
 	public BundleDependency(String bundleName, Map<String, String> attributes, Map<String, String> directives) {
 		super(attributes, directives);
-		this.bundleName = Objects.requireNonNull(bundleName, "bundleName");
+		this.bundleName = Objects.requireNonNull(bundleName, "bundleName is missing");
 	}
 
 	/**

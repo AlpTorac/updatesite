@@ -134,7 +134,7 @@ public final class ManifestReader {
 		}
 		List<UpdateSitePackage> result = new ArrayList<>();
 		for (ManifestElement el : parseHeader(OsgiHeaders.IMPORT_PACKAGE, value)) {
-			var pac = parsePackageRequirement(el);
+			var pac = parsePackage(el);
 			pac.setEntireManifest(manifest);
 			result.add(pac);
 		}
@@ -159,14 +159,14 @@ public final class ManifestReader {
 		}
 		List<UpdateSitePackage> result = new ArrayList<>();
 		for (ManifestElement el : parseHeader(OsgiHeaders.EXPORT_PACKAGE, value)) {
-			var pac = parsePackageRequirement(el);
+			var pac = parsePackage(el);
 			pac.setEntireManifest(manifest);
 			result.add(pac);
 		}
 		return result;
 	}
 
-	private static UpdateSitePackage parsePackageRequirement(ManifestElement el) {
+	private static UpdateSitePackage parsePackage(ManifestElement el) {
 		var packageName = el.getValue();
 		var attributes = collectAttributes(el);
 		var directives = collectDirectives(el);
