@@ -12,6 +12,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 
+import tools.cipm.util.build.p2tm.BundleSymbolicNameData;
 import tools.cipm.util.build.p2tm.FileConstants;
 import tools.cipm.util.build.p2tm.ManifestReader;
 
@@ -116,8 +117,9 @@ public final class MvnRepositoryIndex {
 
 		// --- bundle name (manifest, or curated override, or artifactId fallback) ---
 		var manifestHeaders = ManifestReader.readManifest(jarPath);
-		String bundleName = ManifestReader.readBundleSymbolicName(manifestHeaders)
-				.orElseGet(() -> ARTIFACT_TO_BUNDLE_NAME.getOrDefault(artifactId, artifactId));
+		var bsnd = ManifestReader.readBundleSymbolicName(manifestHeaders);
+		String bundleName = bsnd.isPresent() ? bsnd.get().symbolicName
+				: ARTIFACT_TO_BUNDLE_NAME.getOrDefault(artifactId, artifactId);
 
 		List<Coordinate> result = new ArrayList<>();
 

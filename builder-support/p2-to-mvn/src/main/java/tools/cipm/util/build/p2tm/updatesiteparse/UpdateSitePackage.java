@@ -3,6 +3,8 @@ package tools.cipm.util.build.p2tm.updatesiteparse;
 import java.util.Map;
 import java.util.Objects;
 
+import tools.cipm.util.build.p2tm.OsgiHeaders;
+
 /**
  * A single package export or import entry, parsed from the Export-Package or
  * Import-Package manifest header.
@@ -35,6 +37,21 @@ public class UpdateSitePackage extends InMemoryManifestElementRepresentation {
 	public UpdateSitePackage(String packageName, Map<String, String> attributes, Map<String, String> directives) {
 		super(attributes, directives);
 		this.packageName = Objects.requireNonNull(packageName, "packageName");
+	}
+
+	/**
+	 * The parsed {@code version} attribute, or {@link VersionRange#any()} if
+	 * absent.
+	 */
+	public VersionRange getVersionRange() {
+		return VersionRange.parse(attributes.get(OsgiHeaders.VERSION));
+	}
+
+	/**
+	 * @return Whether this representation declares the {@code optional} directive.
+	 */
+	public boolean isOptional() {
+		return OsgiHeaders.OPTIONAL.equals(directives.get(OsgiHeaders.RESOLUTION));
 	}
 
 	@Override

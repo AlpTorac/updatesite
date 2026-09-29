@@ -20,6 +20,7 @@ import org.openntf.maven.p2.model.P2Repository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import tools.cipm.util.build.p2tm.BundleSymbolicNameData;
 import tools.cipm.util.build.p2tm.FileConstants;
 import tools.cipm.util.build.p2tm.ManifestReader;
 
@@ -54,7 +55,7 @@ public final class UpdateSiteBuilder {
 
 		for (P2Bundle p2 : repo.getBundles()) {
 			UpdateSiteBundle UpdateSiteBundle = parseRemoteBundle(p2);
-			bundlesByName.put(UpdateSiteBundle.symbolicName, UpdateSiteBundle);
+			bundlesByName.put(UpdateSiteBundle.symbolicName.symbolicName, UpdateSiteBundle);
 
 			for (UpdateSitePackage pkg : UpdateSiteBundle.exportedPackages) {
 				packagesToBundles.computeIfAbsent(pkg, k -> new ArrayList<>()).add(UpdateSiteBundle);
@@ -80,7 +81,7 @@ public final class UpdateSiteBuilder {
 
 		for (P2Bundle p2 : repo.getBundles()) {
 			UpdateSiteBundle bundle = parseLocalBundle(p2, localCloneRoot);
-			bundlesByName.put(bundle.symbolicName, bundle);
+			bundlesByName.put(bundle.symbolicName.symbolicName, bundle);
 			for (UpdateSitePackage pkg : bundle.exportedPackages) {
 				packagesToBundles.computeIfAbsent(pkg, k -> new ArrayList<>()).add(bundle);
 			}
@@ -109,10 +110,12 @@ public final class UpdateSiteBuilder {
 			List<UpdateSitePackage> imported = ManifestReader.readImportedPackages(headers);
 			List<UpdateSitePackage> exported = ManifestReader.readExportedPackages(headers);
 
-			String symbolicName = ManifestReader.readBundleSymbolicName(headers).orElse(p2.getId());
+			var symbolicNameData = ManifestReader.readBundleSymbolicName(headers)
+					.orElse(new BundleSymbolicNameData(p2.getId()));
 
-			return new UpdateSiteBundle(symbolicName, p2.getVersion(), p2.getUri("").toString(), required, imported,
-					exported);
+			var bundle = new UpdateSiteBundle(symbolicNameData, p2.getUri("").toString(), required, imported, exported);
+			bundle.setEntireManifest(headers);
+			return bundle;
 		} catch (IOException e) {
 			throw new IllegalStateException(e);
 		} finally {
