@@ -15,9 +15,8 @@ import java.util.jar.JarFile;
 import java.util.stream.Collectors;
 
 /**
- * Builds a flat, complete index of the ../mvn repository as a single list of
- * {@link Coordinate}s. Because every coordinate is self-describing, there is no
- * need for multiple overlapping index maps.
+ * Builds a flat, complete index of the local Maven repository as a single list
+ * of {@link Coordinate}s.
  */
 public final class MvnRepositoryIndex {
 	private static final String EXPORT_PACKAGE = "Export-Package";
@@ -32,17 +31,10 @@ public final class MvnRepositoryIndex {
 	 */
 	private static final Map<String, String> ARTIFACT_TO_BUNDLE_NAME = new LinkedHashMap<>();
 	static {
+		// The "org.pcm.headless.api" bundle is the only exception in the local Maven
+		// repository that only declares the manifest version, hence its mapping is
+		// manually added.
 		ARTIFACT_TO_BUNDLE_NAME.put("api", "org.pcm.headless.api");
-	}
-
-	/**
-	 * Bundles provided by the runtime / target platform that need no Maven
-	 * declaration. Curate per deployment (e.g. the OSGi framework).
-	 */
-	private static final Set<String> PROVIDED_BUNDLES = new HashSet<>();
-	static {
-		PROVIDED_BUNDLES.add("org.eclipse.osgi");
-		PROVIDED_BUNDLES.add("org.osgi.framework");
 	}
 
 	private static Set<Coordinate> coordList;
@@ -55,29 +47,31 @@ public final class MvnRepositoryIndex {
 	}
 
 	/**
-	 * Builds one {@link Coordinate} per installed bundle in the repository.
+	 * Builds one {@link Coordinate} per installed bundle in the repository (in the
+	 * form of a JAR file).
 	 *
 	 * <p>
 	 * Each Maven artifact is stored at:
 	 * 
 	 * <pre>
-	 *   &lt;repoRoot&gt;/&lt;groupPath&gt;/&lt;artifactId&gt;/&lt;version&gt;/&lt;artifactId&gt;-&lt;version&gt;.jar
+	 *   &lt;relativeLocalMavenRepoRootPath&gt;/&lt;groupPath&gt;/&lt;artifactId&gt;/&lt;version&gt;/&lt;artifactId&gt;-&lt;version&gt;.jar
 	 * </pre>
 	 *
-	 * A single walk of the repo derives every field from that layout plus the jar's
-	 * OSGi {@code Bundle-SymbolicName}.
+	 * A single walk of the local Maven repository derives every field from that
+	 * layout plus the jar's OSGi {@code Bundle-SymbolicName}.
 	 *
-	 * @param repoRoot the repository root (e.g. {@code Paths.get("../mvn")})
+	 * @param relativeLocalMavenRepoRootPath The repository root (currently
+	 *                                       {@code Paths.get("../../mvn")})
+	 *                                       relative to the execution path
 	 * @return the list of coordinates for every installed bundle
-	 * @throws IOException if the repository cannot be walked
+	 * @throws IOException if the local Maven repository cannot be walked
 	 */
-	public static Collection<Coordinate> build(Path repoRoot) {
+	public static Collection<Coordinate> build(Path relativeLocalMavenRepoRootPath) {
 		var coordinates = new HashSet<Coordinate>();
-		int repoRootDepth = repoRoot.getNameCount();
 
-		try (var stream = Files.walk(repoRoot)) {
+		try (var stream = Files.walk(relativeLocalMavenRepoRootPath)) {
 			stream.filter(Files::isRegularFile).filter(path -> path.getFileName().toString().endsWith(JAR_EXTENSION))
-					.forEach(jarPath -> coordinates.addAll(coordinatesFor(jarPath, repoRoot, repoRootDepth)));
+					.forEach(jarPath -> coordinates.addAll(coordinatesFor(jarPath, relativeLocalMavenRepoRootPath)));
 		} catch (IOException e) {
 			e.printStackTrace();
 			throw new IllegalStateException(e);
@@ -90,9 +84,17 @@ public final class MvnRepositoryIndex {
 	/**
 	 * Derives groupId, artifactId, version and bundle name from a single jar's
 	 * repository path and manifest.
+	 * 
+	 * @param jarPath                        The path to the JAR file
+	 * @param relativeLocalMavenRepoRootPath The repository root (currently
+	 *                                       {@code Paths.get("../../mvn")})
+	 *                                       relative to the execution path
+	 * @return A list of all Maven coordinates for the given JAR file (at jarPath).
+	 *         The entire JAR file (i.e. the entire bundle) will have one coordinate
+	 *         and each of its exported packages will have their own coordinates.
 	 */
-	private static List<Coordinate> coordinatesFor(Path jarPath, Path repoRoot, int repoRootDepth) {
-		// --- derive the shared Maven identity (unchanged from before) ---
+	private static List<Coordinate> coordinatesFor(Path jarPath, Path relativeLocalMavenRepoRootPath) {
+		// Derive the shared Maven identity
 		Path artifactDir = jarPath.getParent();
 		if (artifactDir == null)
 			return List.of();
@@ -100,12 +102,13 @@ public final class MvnRepositoryIndex {
 		String versionDir = artifactDir.getFileName().toString();
 		Path artifactIdDir = artifactDir.getParent();
 		Path groupPath = artifactIdDir == null ? null : artifactIdDir.getParent();
-		if (artifactIdDir == null || groupPath == null || groupPath.getNameCount() < repoRootDepth) {
+		var localMavenRepoRootDepth = relativeLocalMavenRepoRootPath.getNameCount();
+		if (artifactIdDir == null || groupPath == null || groupPath.getNameCount() < localMavenRepoRootDepth) {
 			return List.of();
 		}
 
 		String artifactId = artifactIdDir.getFileName().toString();
-		String groupId = repoRoot.relativize(groupPath).toString().replace('/', '.');
+		String groupId = relativeLocalMavenRepoRootPath.relativize(groupPath).toString().replace('/', '.');
 
 		String fileName = jarPath.getFileName().toString();
 		String version = versionDir;
@@ -122,7 +125,7 @@ public final class MvnRepositoryIndex {
 		// One Coordinate for the bundle itself
 		result.add(new Coordinate(groupId, artifactId, version, bundleName));
 
-		// --- exported packages: one Coordinate per package ---
+		// One Coordinate per exported package
 		for (String pkg : readExportedPackages(jarPath)) {
 			result.add(new Coordinate(groupId, artifactId, version, pkg, bundleName));
 		}
@@ -133,6 +136,11 @@ public final class MvnRepositoryIndex {
 	 * Reads the Export-Package manifest header and returns the plain package names
 	 * (dropping anything after the first ';', trimming whitespace, skipping
 	 * blanks).
+	 * 
+	 * @param jarPath The path to the JAR file
+	 * 
+	 * @return The list of all exported packages under the manifest file of the
+	 *         given JAR file (at jarPath).
 	 */
 	private static List<String> readExportedPackages(Path jarPath) {
 		try (JarFile jar = new JarFile(jarPath.toFile())) {
@@ -164,6 +172,11 @@ public final class MvnRepositoryIndex {
 	/**
 	 * Reads the OSGi Bundle-SymbolicName from a jar's manifest, dropping any
 	 * parameters after ';'.
+	 * 
+	 * @param jarPath The path to the JAR file
+	 * 
+	 * @return The symbolic bundle name in the manifest file of the given JAR file
+	 *         (at jarPath).
 	 */
 	private static Optional<String> readBundleSymbolicName(Path jarPath) {
 		try (JarFile jar = new JarFile(jarPath.toFile())) {
@@ -182,19 +195,18 @@ public final class MvnRepositoryIndex {
 		}
 	}
 
+	/**
+	 * @return A list of all Maven coordinates within the local Maven repository.
+	 */
 	public static List<Coordinate> findAllBundles() {
 		return coordList.stream().filter(c -> !c.hasPackage()).collect(Collectors.toList());
 	}
 
+	/**
+	 * @return A list of all Maven coordinates within the local Maven repository
+	 *         with the matching bundle name.
+	 */
 	public static List<Coordinate> findByBundleName(String bundleName) {
 		return coordList.stream().filter(c -> c.bundleName.equals(bundleName)).collect(Collectors.toList());
-	}
-
-	public static List<Coordinate> findByArtifactId(String artifactId) {
-		return coordList.stream().filter(c -> c.artifactId.equals(artifactId)).collect(Collectors.toList());
-	}
-
-	public static List<Coordinate> findByPackage(String packageName) {
-		return coordList.stream().filter(c -> c.packageName.equals(packageName)).collect(Collectors.toList());
 	}
 }

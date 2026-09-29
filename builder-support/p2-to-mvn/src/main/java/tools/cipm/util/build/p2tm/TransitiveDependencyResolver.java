@@ -5,6 +5,9 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import tools.cipm.util.build.p2tm.mvnosgimap.Coordinate;
 import tools.cipm.util.build.p2tm.mvnosgimap.MvnRepositoryIndex;
 import tools.cipm.util.build.p2tm.updatesiteparse.Dependency;
@@ -16,6 +19,8 @@ import tools.cipm.util.build.p2tm.updatesiteparse.UpdateSiteBundle;
  * concrete {@link Coordinate} in the {@link MvnRepositoryIndex}.
  */
 public final class TransitiveDependencyResolver {
+	private static final Logger logger = LoggerFactory.getLogger(TransitiveDependencyResolver.class);
+
 	/**
 	 * Resolves and returns the deduped transitive Maven dependencies of the given
 	 * bundle.
@@ -40,13 +45,15 @@ public final class TransitiveDependencyResolver {
 			var coords = MvnRepositoryIndex.findByBundleName(bundleName);
 			Coordinate coord = null;
 			if (!coords.isEmpty()) {
-				// Not installed yet: fall back to default group, no version.
-//				String group = bundleToGroup.getOrDefault(bundleName, defaultGroup);
-//				coord = new Coordinate(group, bundleName, "0", bundleName);
-//				MvnRepositoryIndex.getMvnRepositoryIndices().add(coord);
-//			} else {
+				// Ignore the dependency, if the Maven repository does not have a JAR file for
+				// it. Under the current settings, all necessary JAR files should be present in
+				// the local Maven repository. Therefore, if a specific JAR file is not present,
+				// assume that its dependency should not be considered (e.g. the dependency is
+				// to a native Java library)
 				coord = coords.stream().findFirst().get();
 				result.add(coord);
+			} else {
+				logger.warn("There is no JAR file under the local Maven repository for: " + bundleName);
 			}
 		}
 		return result;

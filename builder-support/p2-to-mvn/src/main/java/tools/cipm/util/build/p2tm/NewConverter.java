@@ -7,11 +7,13 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse.BodyHandlers;
 import java.nio.file.Files;
+import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Scanner;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 import org.openntf.maven.p2.model.P2Repository;
 import org.slf4j.Logger;
@@ -122,6 +124,13 @@ public class NewConverter {
 	private static void installJarLocally(String filePath, String groupId, String artifactId, String version)
 			throws IOException, InterruptedException {
 		// Only supports Linux for now.
+
+		/*
+		 * TODO Use getTransitiveDependencyPOMString(...) in order to generate the POM
+		 * file for transitive dependencies. Then include the generated POM in the
+		 * process below.
+		 */
+
 		var subProcess = new ProcessBuilder("./mvnw", "install:install-file", "-DlocalRepositoryPath=../mvn",
 				"-Dfile=" + filePath, "-DgroupId=" + groupId, "-DartifactId=" + artifactId, "-Dversion=" + version,
 				"-Dpackaging=jar", "-DcreateChecksum=true").inheritIO().start();
@@ -129,35 +138,68 @@ public class NewConverter {
 		System.out.println(subProcessResult);
 	}
 
-	private static String getTransitiveDependencyPOMString() {
-		var mvnDirPath = new File("../../mvn").toPath();
-		var repoPath = new File("/home/sdqstud1/CIPM-Updatesite/archive/cipm-0.1.1").getAbsoluteFile().toPath()
-				.toAbsolutePath();
+	/**
+	 * Generates the String content of the POM file, which declares all transitive
+	 * dependencies needed for the concrete CIPM update site under
+	 * concreteUpdateSitePath. Uses the Maven repository under
+	 * relativeLocalMvnRepoDirPath to locate the JAR files associated with the
+	 * transitive dependencies.
+	 * 
+	 * <p>
+	 * The generated transitive dependencies may contain duplicated dependencies to
+	 * the same Maven artifact MA, if the Maven repository under
+	 * relativeLocalMvnRepoDirPath contains multiple versions of MA.
+	 * 
+	 * <p>
+	 * FIXME The generated POM file content is currently only manually tested by
+	 * copy-pasting it into POM files of CIPM and removing the required bundles and
+	 * imported packages from the manifest files of CIPM.
+	 * 
+	 * @param relativeLocalMvnRepoDirPath Relative path to the Maven directory
+	 *                                    ("mvn" directory) of the overall update
+	 *                                    site (currently this entire repository).
+	 *                                    Must be relative to the execution
+	 *                                    directory. Currently {@code "../../mvn"}.
+	 * @param concreteUpdateSitePath      Path to the concrete CIPM update site
+	 *                                    (e.g. {@code archive/cipm-0.1.1}). Will be
+	 *                                    converted to absolute path, if not already
+	 *                                    an absolute path
+	 * @param pomGroupID                  The group ID of the generated POM file for
+	 *                                    transitive dependencies
+	 * @param pomArtifactID               The artifact ID of the generated POM file
+	 *                                    for transitive dependencies
+	 * @param pomVersion                  The version of the generated POM file for
+	 *                                    transitive dependencies
+	 * @return The content of the POM for the transitive dependencies (as String).
+	 */
+	private static String getTransitiveDependencyPOMString(Path relativeLocalMvnRepoDirPath,
+			Path concreteUpdateSitePath, String pomGroupID, String pomArtifactID, String pomVersion) {
+		var absConcreteUpdateSitePath = concreteUpdateSitePath.toAbsolutePath();
 
-		// Build the Maven Repository Index
-		MvnRepositoryIndex.build(mvnDirPath);
+		// Parse all Maven coordinates available under the local Maven repository
+		MvnRepositoryIndex.build(relativeLocalMvnRepoDirPath);
 
-		// Parse the update site into an in-memory model.
+		// Parse the concrete update site into an in-memory model.
 		UpdateSite updateSite;
 		try {
-			updateSite = new UpdateSiteBuilder().buildLocal(repoPath.toString());
+			updateSite = new UpdateSiteBuilder().buildLocal(absConcreteUpdateSitePath.toString());
 		} catch (IOException e) {
 			throw new RuntimeException("Could not parse update site", e);
 		}
 
-		P2Repository p2Repo = P2Repository.getInstance(URI.create(updateSite.repositoryUri), logger);
-		var allBundles = p2Repo.getBundles();
+		// Retrieve all P2 bundles from the parsed update site
+		var allBundles = updateSite.bundlesByName.values().stream().collect(Collectors.toList());
 
 		TransitiveDependencyResolver resolver = new TransitiveDependencyResolver();
 
 		Set<Coordinate> allTransitiveDeps = new HashSet<>();
 
+		// Resolve all transitive dependencies
 		for (var p2 : allBundles) {
-			UpdateSiteBundle bundle = updateSite.bundlesByName.get(p2.getId());
-			List<Coordinate> transitiveDepsForBundle = bundle != null ? resolver.resolve(bundle) : List.of();
+			List<Coordinate> transitiveDepsForBundle = p2 != null ? resolver.resolve(p2) : List.of();
 			allTransitiveDeps.addAll(transitiveDepsForBundle);
 		}
 
-		return PomWriter.render("abc", "def", "v0.0.0", allTransitiveDeps);
+		return PomWriter.render(pomGroupID, pomArtifactID, pomVersion, allTransitiveDeps);
 	}
 }
