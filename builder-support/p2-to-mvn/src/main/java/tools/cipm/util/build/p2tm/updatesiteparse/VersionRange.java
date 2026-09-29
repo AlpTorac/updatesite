@@ -1,7 +1,6 @@
 package tools.cipm.util.build.p2tm.updatesiteparse;
 
 import java.util.Objects;
-import java.util.Optional;
 
 /**
  * An immutable, parsed representation of a version range.
@@ -21,9 +20,9 @@ import java.util.Optional;
 public final class VersionRange {
 
 	private final String lowerVersion; // may be null when unbounded
-	private final boolean includeLower;
+	private final boolean includeLower; // Whether lowerVersion is inclusive
 	private final String upperVersion; // may be null when unbounded
-	private final boolean includeUpper;
+	private final boolean includeUpper; // Whether upperVersion is inclusive
 	private final boolean bounded; // false when it's a single exact version
 
 	private VersionRange(String lowerVersion, boolean includeLower, String upperVersion, boolean includeUpper,
@@ -58,8 +57,10 @@ public final class VersionRange {
 	/**
 	 * Parses a version-range string into a {@link VersionRange}.
 	 *
-	 * @param value the raw header value
-	 * @return the parsed range; always non-null
+	 * @param value the raw header value, may be null if no version range or exact
+	 *              version is specified
+	 * @return the parsed range, always non-null, defaults to {@link #any()} if the
+	 *         given value is empty or blank or null
 	 * @throws IllegalArgumentException if {@code value} is non-blank but malformed
 	 *                                  (e.g. an unterminated or comma-less
 	 *                                  bracketed range)
@@ -97,7 +98,12 @@ public final class VersionRange {
 		return new VersionRange(lower, includeLower, upper, includeUpper, true);
 	}
 
-	/** Returns null for empty/∞ bounds (unbounded). */
+	/**
+	 * Handles cases, where no bounds are specified in version ranges.
+	 * 
+	 * @param raw The version bound as string or empty if no bound is specified
+	 * @return Returns null for empty/∞ bounds (unbounded).
+	 */
 	private static String normalizeBound(String raw) {
 		if (raw == null)
 			return null;
@@ -152,16 +158,6 @@ public final class VersionRange {
 			return false;
 		return includeLower == other.includeLower && includeUpper == other.includeUpper && bounded == other.bounded
 				&& Objects.equals(lowerVersion, other.lowerVersion) && Objects.equals(upperVersion, other.upperVersion);
-	}
-
-	@Override
-	public int hashCode() {
-		int result = Objects.hashCode(lowerVersion);
-		result = 31 * result + (includeLower ? 1 : 0);
-		result = 31 * result + Objects.hashCode(upperVersion);
-		result = 31 * result + (includeUpper ? 1 : 0);
-		result = 31 * result + (bounded ? 1 : 0);
-		return result;
 	}
 
 	@Override
