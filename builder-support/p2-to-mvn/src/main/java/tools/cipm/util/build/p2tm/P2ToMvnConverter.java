@@ -6,12 +6,22 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse.BodyHandlers;
 import java.nio.file.Files;
+import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.HashSet;
+import java.util.List;
 import java.util.Scanner;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 import org.openntf.maven.p2.model.P2Repository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import tools.cipm.util.build.p2tm.mvnosgimap.Coordinate;
+import tools.cipm.util.build.p2tm.mvnosgimap.MvnRepositoryIndex;
+import tools.cipm.util.build.p2tm.updatesiteparse.UpdateSite;
+import tools.cipm.util.build.p2tm.updatesiteparse.UpdateSiteBuilder;
 
 public class P2ToMvnConverter {
     private static final Logger logger = LoggerFactory.getLogger(P2ToMvnConverter.class);
@@ -122,6 +132,13 @@ public class P2ToMvnConverter {
 
     private static void installJarLocally(String filePath, String groupId, String artifactId, String version) throws IOException, InterruptedException {
         // Only supports Linux for now.
+    	
+		/*
+		 * TODO Use getTransitiveDependencyPOMString(...) in order to generate the POM
+		 * file for transitive dependencies. Then include the generated POM in the
+		 * process below.
+		 */
+    	
         var subProcess = new ProcessBuilder(
             "./mvnw", "install:install-file", "-DlocalRepositoryPath=../mvn",
             "-Dfile=" + filePath, "-DgroupId=" + groupId,
@@ -132,4 +149,64 @@ public class P2ToMvnConverter {
         var subProcessResult = subProcess.waitFor();
         System.out.println(subProcessResult);
     }
+
+	/**
+	 * Generates the String content of the POM file, which declares all transitive
+	 * dependencies needed for the concrete CIPM update site under
+	 * concreteUpdateSitePath. Uses the Maven repository under
+	 * relativeLocalMvnRepoDirPath to locate the JAR files associated with the
+	 * transitive dependencies.
+	 * 
+	 * <p>
+	 * FIXME The generated POM file content is currently only manually tested by
+	 * copy-pasting it into POM files of CIPM and removing the required bundles and
+	 * imported packages from the manifest files of CIPM.
+	 * 
+	 * @param relativeLocalMvnRepoDirPath Relative path to the Maven directory
+	 *                                    ("mvn" directory) of the overall update
+	 *                                    site (currently this entire repository).
+	 *                                    Must be relative to the execution
+	 *                                    directory. Currently {@code "../../mvn"}.
+	 * @param concreteUpdateSitePath      Path to the concrete CIPM update site
+	 *                                    (e.g. {@code archive/cipm-0.1.1}). Will be
+	 *                                    converted to absolute path, if not already
+	 *                                    an absolute path
+	 * @param pomGroupID                  The group ID of the generated POM file for
+	 *                                    transitive dependencies
+	 * @param pomArtifactID               The artifact ID of the generated POM file
+	 *                                    for transitive dependencies
+	 * @param pomVersion                  The version of the generated POM file for
+	 *                                    transitive dependencies
+	 * @return The content of the POM for the transitive dependencies (as String).
+	 */
+	private static String getTransitiveDependencyPOMString(Path relativeLocalMvnRepoDirPath,
+			Path concreteUpdateSitePath, String pomGroupID, String pomArtifactID, String pomVersion) {
+		var absConcreteUpdateSitePath = concreteUpdateSitePath.toAbsolutePath();
+
+		// Parse all Maven coordinates available under the local Maven repository
+		MvnRepositoryIndex.build(relativeLocalMvnRepoDirPath);
+
+		// Parse the concrete update site into an in-memory model.
+		UpdateSite updateSite;
+		try {
+			updateSite = new UpdateSiteBuilder().buildLocal(absConcreteUpdateSitePath.toString());
+		} catch (IOException e) {
+			throw new RuntimeException("Could not parse update site", e);
+		}
+
+		// Retrieve all P2 bundles from the parsed update site
+		var allBundles = updateSite.bundlesByName.values().stream().collect(Collectors.toList());
+
+		TransitiveDependencyResolver resolver = new TransitiveDependencyResolver();
+
+		Set<Coordinate> allTransitiveDeps = new HashSet<>();
+
+		// Resolve all transitive dependencies
+		for (var p2 : allBundles) {
+			List<Coordinate> transitiveDepsForBundle = p2 != null ? resolver.resolve(p2) : List.of();
+			allTransitiveDeps.addAll(transitiveDepsForBundle);
+		}
+
+		return PomWriter.render(pomGroupID, pomArtifactID, pomVersion, allTransitiveDeps);
+	}
 }
