@@ -24,6 +24,15 @@ public class BundleSymbolicNameData extends InMemoryManifestElementRepresentatio
 	}
 
 	@Override
+	public boolean equals(Object o) {
+		if (this == o)
+			return true;
+		if (!(o instanceof BundleSymbolicNameData other))
+			return false;
+		return symbolicName.equals(other.symbolicName) && super.equals(other);
+	}
+
+	@Override
 	public String toString() {
 		return "{symbolicName=" + symbolicName + ", " + getAttributesString() + ", " + getDirectivesString() + "}";
 	}

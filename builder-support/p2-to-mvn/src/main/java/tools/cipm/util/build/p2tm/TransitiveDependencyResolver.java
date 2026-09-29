@@ -22,11 +22,15 @@ public final class TransitiveDependencyResolver {
 	private static final Logger logger = LoggerFactory.getLogger(TransitiveDependencyResolver.class);
 
 	/**
-	 * Resolves and returns the deduped transitive Maven dependencies of the given
-	 * bundle.
+	 * Resolves and returns the de-duplicated transitive Maven dependencies of the
+	 * given bundle.
+	 * 
+	 * <p>
+	 * Note: Currently de-duplicates the required bundles by name. FIXME May
+	 * potentially require fixes, since version conflicts are ignored for now
 	 *
 	 * @param bundle the bundle whose requirements to resolve
-	 * @return a deduped list of coordinates (never null)
+	 * @return a de-duplicated list of coordinates (never null)
 	 */
 	public List<Coordinate> resolve(UpdateSiteBundle bundle) {
 		Set<String> seen = new LinkedHashSet<>(); // dedup by bundle name
@@ -50,6 +54,8 @@ public final class TransitiveDependencyResolver {
 				// the local Maven repository. Therefore, if a specific JAR file is not present,
 				// assume that its dependency should not be considered (e.g. the dependency is
 				// to a native Java library)
+
+				// TODO Attempt to find the coordinate with the matching version
 				coord = coords.stream().findFirst().get();
 				result.add(coord);
 			} else {

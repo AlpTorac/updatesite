@@ -6,9 +6,7 @@ import java.net.URI;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
-import java.util.stream.Collectors;
 
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.openntf.maven.p2.model.P2Repository;
 import org.slf4j.Logger;
@@ -21,35 +19,12 @@ import tools.cipm.util.build.p2tm.updatesiteparse.UpdateSiteBuilder;
 import tools.cipm.util.build.p2tm.updatesiteparse.UpdateSiteBundle;
 
 public class MavenTest {
-	@Disabled
-	@Test
-	public void test() {
-//		var map = NewConverter.buildArtifactToGroupIndexCache();
-//		System.out.println(map.toString());
-
-		var mvnDirPath = new File("../../mvn").toPath();
-		var list = MvnRepositoryIndex.build(mvnDirPath);
-		System.out.println(list);
-
-		var differentBundleName = list.stream().filter(e -> !e.bundleName.equals(e.artifactId))
-				.collect(Collectors.toList());
-		System.out.println(
-				System.lineSeparator() + System.lineSeparator() + System.lineSeparator() + differentBundleName);
-
-		var onlyBundle = list.stream().filter(e -> !e.hasPackage()).collect(Collectors.toList());
-		System.out.println(System.lineSeparator() + System.lineSeparator() + System.lineSeparator() + onlyBundle);
-
-		var pom = PomWriter.render("abc", "def", "v0.0.0", MvnRepositoryIndex.findAllBundles());
-		System.out.println(pom);
-	}
-
 	private static final Logger logger = LoggerFactory.getLogger(MavenTest.class);
 
 	@Test
 	public void testWithMapping() {
 		var mvnDirPath = new File("../../mvn").toPath();
-		var repoPath = new File("/home/sdqstud1/CIPM-Updatesite/archive/cipm-0.1.1").getAbsoluteFile().toPath()
-				.toAbsolutePath();
+		var repoPath = new File("../../archive/cipm-0.1.1").getAbsoluteFile().toPath().toAbsolutePath();
 
 		// Build the Maven Repository Index
 		MvnRepositoryIndex.build(mvnDirPath);
@@ -69,12 +44,15 @@ public class MavenTest {
 
 		Set<Coordinate> allTransitiveDeps = new HashSet<>();
 
+		// Resolve all transitive dependencies for all bundles
 		for (var p2 : allBundles) {
 			UpdateSiteBundle bundle = updateSite.bundlesByName.get(p2.getId());
 			List<Coordinate> transitiveDepsForBundle = bundle != null ? resolver.resolve(bundle) : List.of();
 			allTransitiveDeps.addAll(transitiveDepsForBundle);
 		}
 
+		// Render the POM file content with placeholder groupID, artifactID and version
+		// They have to be replaced by actual values in P2ToMvnConverter
 		var pom = PomWriter.render("abc", "def", "v0.0.0", allTransitiveDeps);
 		System.out.println(pom);
 	}

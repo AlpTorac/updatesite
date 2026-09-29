@@ -19,6 +19,9 @@ public final class PomWriter {
 	 * Writes a POM file that declares all given dependencies. Creates the POM file
 	 * and all necessary directories, if not already present.
 	 * 
+	 * <p>
+	 * FIXME Not tested
+	 * 
 	 * @param targetDir    The directory, under which the POM file will be generated
 	 * @param pomFileName  The name of the generated POM file
 	 * @param groupId      The group ID of the generated POM file
