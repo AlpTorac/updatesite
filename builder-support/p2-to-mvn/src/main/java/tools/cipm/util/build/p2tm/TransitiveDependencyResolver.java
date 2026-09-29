@@ -54,9 +54,12 @@ public final class TransitiveDependencyResolver {
 				// the local Maven repository. Therefore, if a specific JAR file is not present,
 				// assume that its dependency should not be considered (e.g. the dependency is
 				// to a native Java library)
-
-				// TODO Attempt to find the coordinate with the matching version
-				coord = coords.stream().findFirst().get();
+				//
+				// Attempt to find the coordinate with the exact version first. If there is no
+				// such coordinate, just return the first coordinate found.
+				//
+				coord = coords.stream().filter(c -> required.getVersionRange().inRange(c.version)).findFirst()
+						.orElse(coords.stream().findFirst().get());
 				result.add(coord);
 			} else {
 				logger.warn("There is no JAR file under the local Maven repository for: " + bundleName);
