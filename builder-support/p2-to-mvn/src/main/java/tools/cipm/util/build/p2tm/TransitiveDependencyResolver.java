@@ -10,7 +10,7 @@ import org.slf4j.LoggerFactory;
 
 import tools.cipm.util.build.p2tm.mvnosgimap.Coordinate;
 import tools.cipm.util.build.p2tm.mvnosgimap.MvnRepositoryIndex;
-import tools.cipm.util.build.p2tm.updatesiteparse.Dependency;
+import tools.cipm.util.build.p2tm.updatesiteparse.BundleDependency;
 import tools.cipm.util.build.p2tm.updatesiteparse.UpdateSiteBundle;
 
 /**
@@ -32,7 +32,7 @@ public final class TransitiveDependencyResolver {
 		Set<String> seen = new LinkedHashSet<>(); // dedup by bundle name
 		List<Coordinate> result = new ArrayList<>();
 
-		for (Dependency required : bundle.requiredBundles) {
+		for (BundleDependency required : bundle.requiredBundles) {
 			String bundleName = required.bundleName;
 
 			// Skip duplicate required bundles (e.g. org.eclipse.ocl.ecore

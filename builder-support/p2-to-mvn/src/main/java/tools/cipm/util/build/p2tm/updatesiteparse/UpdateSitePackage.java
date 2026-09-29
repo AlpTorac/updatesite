@@ -3,8 +3,6 @@ package tools.cipm.util.build.p2tm.updatesiteparse;
 import java.util.Map;
 import java.util.Objects;
 
-import tools.cipm.util.build.p2tm.OsgiHeaders;
-
 /**
  * A single package export or import entry, parsed from the Export-Package or
  * Import-Package manifest header.
@@ -22,23 +20,10 @@ import tools.cipm.util.build.p2tm.OsgiHeaders;
  * {@code x-internal:=}, {@code mandatory}, etc.).
  * </p>
  */
-public final class UpdateSitePackage {
+public class UpdateSitePackage extends InMemoryManifestElementRepresentation {
 
 	/** The package name. */
 	public final String packageName;
-
-	/**
-	 * All attribute name/value pairs declared on this package entry (e.g.
-	 * {@code version}, {@code bundle-symbolic-name}, {@code mandatory}).
-	 * Unmodifiable. The {@code version} is also mirrored here.
-	 */
-	public final Map<String, String> attributes;
-
-	/**
-	 * All directive name/value pairs declared on this package entry (e.g.
-	 * {@code resolution}, {@code uses}, {@code x-internal}). Unmodifiable.
-	 */
-	public final Map<String, String> directives;
 
 	/**
 	 * Creates a package requirement with the given attributes and directives.
@@ -47,26 +32,9 @@ public final class UpdateSitePackage {
 	 * @param attributes  all attribute name/value pairs (may be {@code null})
 	 * @param directives  all directive name/value pairs (may be {@code null})
 	 */
-	public UpdateSitePackage(String packageName, Map<String, String> attributes,
-			Map<String, String> directives) {
+	public UpdateSitePackage(String packageName, Map<String, String> attributes, Map<String, String> directives) {
+		super(attributes, directives);
 		this.packageName = Objects.requireNonNull(packageName, "packageName");
-		this.attributes = Map.copyOf(attributes == null ? Map.of() : attributes);
-		this.directives = Map.copyOf(directives == null ? Map.of() : directives);
-	}
-
-	/**
-	 * The parsed {@code version} attribute, or {@link VersionRange#any()} if
-	 * absent.
-	 */
-	public VersionRange getVersionRange() {
-		return VersionRange.parse(attributes.get(OsgiHeaders.VERSION));
-	}
-
-	/**
-	 * @return Whether this package dependency is declared as optional
-	 */
-	public boolean isOptional() {
-		return OsgiHeaders.OPTIONAL.equals(directives.get(OsgiHeaders.RESOLUTION));
 	}
 
 	@Override
@@ -75,13 +43,12 @@ public final class UpdateSitePackage {
 			return true;
 		if (!(o instanceof UpdateSitePackage other))
 			return false;
-		return packageName.equals(other.packageName) && attributes.equals(other.attributes)
-				&& directives.equals(other.directives);
+		return packageName.equals(other.packageName) && super.equals(other);
 	}
 
 	@Override
 	public String toString() {
-		return "UpdateSitePackageRequirement{" + "packageName='" + packageName + '\'' + ", attributes=" + attributes
-				+ ", directives=" + directives + '}';
+		return this.getClass().getSimpleName() + "{" + "packageName='" + packageName + '\'' + ", "
+				+ getAttributesString() + ", " + getDirectivesString() + '}';
 	}
 }
