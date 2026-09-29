@@ -42,6 +42,9 @@ public final class UpdateSiteBuilder {
 	/**
 	 * Builds the in-memory representation of the given p2 update site.
 	 *
+	 * <p>
+	 * FIXME Not tested
+	 *
 	 * @param repositoryUri the p2 repository URI
 	 * @return the fully parsed {@link UpdateSite}
 	 */
@@ -88,6 +91,9 @@ public final class UpdateSiteBuilder {
 		return new UpdateSite(repositoryUri, bundlesByName, packagesToBundles);
 	}
 
+	/**
+	 * FIXME Not tested
+	 */
 	private UpdateSiteBundle parseRemoteBundle(P2Bundle p2) throws IOException, InterruptedException {
 		String uri = p2.getUri("").toString();
 		Path tmp = downloadToTemp(uri);

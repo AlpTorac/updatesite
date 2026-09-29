@@ -1,5 +1,8 @@
 package tools.cipm.util.build.p2tm;
 
+/**
+ * Contains constants about file names, extensions, as well as URI prefixes
+ */
 public final class FileConstants {
 	private FileConstants() {
 	}
