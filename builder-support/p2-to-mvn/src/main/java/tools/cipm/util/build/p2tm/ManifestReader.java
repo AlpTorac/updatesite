@@ -15,7 +15,7 @@ import org.eclipse.osgi.util.ManifestElement;
 import org.osgi.framework.BundleException;
 
 import tools.cipm.util.build.p2tm.updatesiteparse.Dependency;
-import tools.cipm.util.build.p2tm.updatesiteparse.UpdateSitePackageRequirement;
+import tools.cipm.util.build.p2tm.updatesiteparse.UpdateSitePackage;
 
 /**
  * Reads and parses OSGi bundle manifest headers using {@link ManifestElement},
@@ -107,17 +107,17 @@ public final class ManifestReader {
 
 	/**
 	 * Parses the {@code Import-Package} header into
-	 * {@link UpdateSitePackageRequirement}s.
+	 * {@link UpdateSitePackage}s.
 	 *
 	 * @param manifest the parsed manifest headers
 	 * @return the list of imported-package requirements (never null)
 	 */
-	public static List<UpdateSitePackageRequirement> readImportedPackages(Map<String, String> manifest) {
+	public static List<UpdateSitePackage> readImportedPackages(Map<String, String> manifest) {
 		String value = manifest.get(OsgiHeaders.IMPORT_PACKAGE);
 		if (value == null || value.isBlank()) {
 			return List.of();
 		}
-		List<UpdateSitePackageRequirement> result = new ArrayList<>();
+		List<UpdateSitePackage> result = new ArrayList<>();
 		for (ManifestElement el : parseHeader(OsgiHeaders.IMPORT_PACKAGE, value)) {
 			result.add(parsePackageRequirement(el));
 		}
@@ -126,7 +126,7 @@ public final class ManifestReader {
 
 	/**
 	 * Parses the {@code Export-Package} header into
-	 * {@link UpdateSitePackageRequirement}s.
+	 * {@link UpdateSitePackage}s.
 	 *
 	 * <p>
 	 * Exports are not "optional" in the same sense as imports, so {@code optional}
@@ -136,23 +136,23 @@ public final class ManifestReader {
 	 * @param manifest the parsed manifest headers
 	 * @return the list of exported-package requirements (never null)
 	 */
-	public static List<UpdateSitePackageRequirement> readExportedPackages(Map<String, String> manifest) {
+	public static List<UpdateSitePackage> readExportedPackages(Map<String, String> manifest) {
 		String value = manifest.get(OsgiHeaders.EXPORT_PACKAGE);
 		if (value == null || value.isBlank()) {
 			return List.of();
 		}
-		List<UpdateSitePackageRequirement> result = new ArrayList<>();
+		List<UpdateSitePackage> result = new ArrayList<>();
 		for (ManifestElement el : parseHeader(OsgiHeaders.EXPORT_PACKAGE, value)) {
 			result.add(parsePackageRequirement(el));
 		}
 		return result;
 	}
 
-	private static UpdateSitePackageRequirement parsePackageRequirement(ManifestElement el) {
+	private static UpdateSitePackage parsePackageRequirement(ManifestElement el) {
 		var packageName = el.getValue();
 		var attributes = collectAttributes(el);
 		var directives = collectDirectives(el);
-		return new UpdateSitePackageRequirement(packageName, attributes, directives);
+		return new UpdateSitePackage(packageName, attributes, directives);
 	}
 
 	/**
@@ -163,9 +163,9 @@ public final class ManifestReader {
 	 * @return the list of exported package name strings (never null)
 	 */
 	public static List<String> readExportedPackageNames(Map<String, String> manifest) {
-		List<UpdateSitePackageRequirement> reqs = readExportedPackages(manifest);
+		List<UpdateSitePackage> reqs = readExportedPackages(manifest);
 		List<String> names = new ArrayList<>(reqs.size());
-		for (UpdateSitePackageRequirement req : reqs) {
+		for (UpdateSitePackage req : reqs) {
 			names.add(req.packageName);
 		}
 		return names;
