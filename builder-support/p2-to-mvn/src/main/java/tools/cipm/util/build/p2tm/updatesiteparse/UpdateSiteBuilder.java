@@ -15,15 +15,13 @@ import java.util.List;
 import java.util.Map;
 import java.util.jar.JarFile;
 
-import org.eclipse.osgi.util.ManifestElement;
 import org.openntf.maven.p2.model.P2Bundle;
 import org.openntf.maven.p2.model.P2Repository;
-import org.osgi.framework.BundleException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import tools.cipm.util.build.p2tm.FileConstants;
-import tools.cipm.util.build.p2tm.OsgiHeaders;
+import tools.cipm.util.build.p2tm.ManifestReader;
 
 /**
  * Builds a complete {@link UpdateSite} by combining p2-layout-resolver
@@ -103,15 +101,15 @@ public final class UpdateSiteBuilder {
 	private static UpdateSiteBundle parseBundle(P2Bundle p2, Path jarPath, boolean deleteJARFile) {
 		try (JarFile jar = new JarFile(jarPath.toFile())) {
 			InputStream is = jar.getInputStream(jar.getJarEntry(FileConstants.JAR_MANIFEST_PATH));
-			// ManifestElement.parseBundleManifest fills a Map<String,String> of
-			// raw header values (no localization; just raw OSGi headers).
-			Map<String, String> headers = parseBundleManifest(is);
+			// Use ManifestReader.readManifest(is), since the finally block is crucial for
+			// deleting the locally cloned JAR files after exceptions
+			Map<String, String> headers = ManifestReader.readManifest(is);
 
-			List<Dependency> required = parseRequireBundle(headers.get(OsgiHeaders.REQUIRE_BUNDLE));
-			List<UpdateSitePackageRequirement> imported = parseImportPackage(headers.get(OsgiHeaders.IMPORT_PACKAGE));
-			List<UpdateSitePackageRequirement> exported = parseExportPackage(headers.get(OsgiHeaders.EXPORT_PACKAGE));
+			List<Dependency> required = ManifestReader.readRequiredBundles(headers);
+			List<UpdateSitePackageRequirement> imported = ManifestReader.readImportedPackages(headers);
+			List<UpdateSitePackageRequirement> exported = ManifestReader.readExportedPackages(headers);
 
-			String symbolicName = resolveSymbolicName(headers, p2);
+			String symbolicName = ManifestReader.readBundleSymbolicName(headers).orElse(p2.getId());
 
 			return new UpdateSiteBundle(symbolicName, p2.getVersion(), p2.getUri("").toString(), required, imported,
 					exported);
@@ -141,16 +139,9 @@ public final class UpdateSiteBuilder {
 		return parseBundle(p2, jarPath, false);
 	}
 
-	private static Map<String, String> parseBundleManifest(InputStream is) {
-		Map<String, String> headers = new LinkedHashMap<>();
-		try {
-			ManifestElement.parseBundleManifest(is, headers);
-		} catch (IOException | BundleException e) {
-			throw new IllegalStateException(e);
-		}
-		return headers;
-	}
-
+	/**
+	 * FIXME Not tested
+	 */
 	private Path downloadToTemp(String uri) throws IOException, InterruptedException {
 		Path tmp = Files.createTempFile("p2bundle", FileConstants.JAR_FILE_EXTENSION);
 		HttpResponse<Path> resp = http.send(HttpRequest.newBuilder(URI.create(uri)).GET().build(),
@@ -159,86 +150,5 @@ public final class UpdateSiteBuilder {
 			throw new IOException("Failed to download " + uri + ": HTTP " + resp.statusCode());
 		}
 		return tmp;
-	}
-
-	// ------------------------------------------------------------------
-	// OSGi manifest parsing via ManifestElement
-	// ------------------------------------------------------------------
-
-	/**
-	 * Resolves a bundle's symbolic name from its manifest's
-	 * {@code Bundle-SymbolicName} header, falling back to the repository id
-	 * ({@code p2.getId()}) when the manifest has no usable value.
-	 *
-	 * <p>
-	 * Some artifacts (e.g. plain non-OSGi jars such as
-	 * {@code org.pcm.headless.api}) have no {@code Bundle-SymbolicName} at all, in
-	 * which case the repository id is used. Any parameters after a {@code ';'}
-	 * (e.g. {@code ;singleton:=true}) are stripped.
-	 * </p>
-	 *
-	 * @param headers the parsed manifest headers
-	 * @param p2      the repository bundle entry
-	 * @return the resolved symbolic name (never null or blank)
-	 */
-	private static String resolveSymbolicName(Map<String, String> headers, P2Bundle p2) {
-		String bsn = headers.get(OsgiHeaders.BUNDLE_SYMBOLIC_NAME);
-		if (bsn != null) {
-			int semi = bsn.indexOf(';');
-			String clean = (semi == -1) ? bsn : bsn.substring(0, semi);
-			clean = clean.trim();
-			if (!clean.isEmpty()) {
-				return clean;
-			}
-		}
-		return p2.getId();
-	}
-
-	private static ManifestElement[] parseHeader(String header, String value) {
-		ManifestElement[] headers = null;
-		try {
-			headers = ManifestElement.parseHeader(OsgiHeaders.REQUIRE_BUNDLE, value);
-		} catch (BundleException e) {
-			throw new IllegalStateException(e);
-		}
-		return headers;
-	}
-
-	private static List<Dependency> parseRequireBundle(String value) {
-		List<Dependency> result = new ArrayList<>();
-		if (value == null)
-			return result;
-		for (ManifestElement el : parseHeader(OsgiHeaders.REQUIRE_BUNDLE, value)) {
-			String name = el.getValue();
-			String version = el.getAttribute(OsgiHeaders.BUNDLE_VERSION);
-			result.add(new Dependency(name, version == null ? "" : version));
-		}
-		return result;
-	}
-
-	private static List<UpdateSitePackageRequirement> parseImportPackage(String value) {
-		List<UpdateSitePackageRequirement> result = new ArrayList<>();
-		if (value == null)
-			return result;
-		for (ManifestElement el : parseHeader(OsgiHeaders.IMPORT_PACKAGE, value)) {
-			String version = el.getAttribute(OsgiHeaders.VERSION);
-			boolean optional = OsgiHeaders.OPTIONAL.equals(el.getDirective(OsgiHeaders.RESOLUTION));
-			result.add(new UpdateSitePackageRequirement(el.getValue(), version, optional));
-		}
-		return result;
-	}
-
-	private static List<UpdateSitePackageRequirement> parseExportPackage(String value) {
-		List<UpdateSitePackageRequirement> result = new ArrayList<>();
-		if (value == null)
-			return result;
-		for (ManifestElement el : parseHeader(OsgiHeaders.EXPORT_PACKAGE, value)) {
-			String version = el.getAttribute(OsgiHeaders.VERSION);
-			// Export-Package uses uses:= and x-friends:= directives; for parity
-			// with imports we capture the version attribute. Exports are not
-			// "optional" in the same sense, so optional stays false.
-			result.add(new UpdateSitePackageRequirement(el.getValue(), version, false));
-		}
-		return result;
 	}
 }
