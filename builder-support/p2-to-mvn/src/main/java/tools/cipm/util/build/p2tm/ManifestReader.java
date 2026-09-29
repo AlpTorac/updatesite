@@ -4,6 +4,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Enumeration;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -118,9 +119,7 @@ public final class ManifestReader {
 		}
 		List<UpdateSitePackageRequirement> result = new ArrayList<>();
 		for (ManifestElement el : parseHeader(OsgiHeaders.IMPORT_PACKAGE, value)) {
-			String version = el.getAttribute(OsgiHeaders.VERSION);
-			boolean optional = OsgiHeaders.OPTIONAL.equals(el.getDirective(OsgiHeaders.RESOLUTION));
-			result.add(new UpdateSitePackageRequirement(el.getValue(), version, optional));
+			result.add(parsePackageRequirement(el));
 		}
 		return result;
 	}
@@ -144,11 +143,16 @@ public final class ManifestReader {
 		}
 		List<UpdateSitePackageRequirement> result = new ArrayList<>();
 		for (ManifestElement el : parseHeader(OsgiHeaders.EXPORT_PACKAGE, value)) {
-			String version = el.getAttribute(OsgiHeaders.VERSION);
-			// Exports are not optional; parity with imports, carrying the version.
-			result.add(new UpdateSitePackageRequirement(el.getValue(), version, false));
+			result.add(parsePackageRequirement(el));
 		}
 		return result;
+	}
+
+	private static UpdateSitePackageRequirement parsePackageRequirement(ManifestElement el) {
+		var packageName = el.getValue();
+		var attributes = collectAttributes(el);
+		var directives = collectDirectives(el);
+		return new UpdateSitePackageRequirement(packageName, attributes, directives);
 	}
 
 	/**
@@ -173,5 +177,41 @@ public final class ManifestReader {
 		} catch (BundleException e) {
 			throw new IllegalStateException(e);
 		}
+	}
+
+	/**
+	 * Collects all attribute name/value pairs from the element.
+	 */
+	private static Map<String, String> collectAttributes(ManifestElement el) {
+		Map<String, String> result = new LinkedHashMap<>();
+		Enumeration<String> keys = el.getKeys();
+		if (keys != null) {
+			while (keys.hasMoreElements()) {
+				String key = keys.nextElement();
+				String value = el.getAttribute(key);
+				if (value != null) {
+					result.put(key, value);
+				}
+			}
+		}
+		return result;
+	}
+
+	/**
+	 * Collects all directive name/value pairs from the element.
+	 */
+	private static Map<String, String> collectDirectives(ManifestElement el) {
+		Map<String, String> result = new LinkedHashMap<>();
+		Enumeration<String> keys = el.getDirectiveKeys();
+		if (keys != null) {
+			while (keys.hasMoreElements()) {
+				String key = keys.nextElement();
+				String value = el.getDirective(key);
+				if (value != null) {
+					result.put(key, value);
+				}
+			}
+		}
+		return result;
 	}
 }

@@ -1,5 +1,10 @@
 package tools.cipm.util.build.p2tm.updatesiteparse;
 
+import java.util.Map;
+import java.util.Objects;
+
+import tools.cipm.util.build.p2tm.OsgiHeaders;
+
 /**
  * A single package export or import entry, parsed from the Export-Package or
  * Import-Package manifest header.
@@ -9,43 +14,74 @@ package tools.cipm.util.build.p2tm.updatesiteparse;
  * attributes (such as {@code version="..."}) and directives (such as
  * {@code resolution:=optional}), so a single type models both directions.
  * </p>
+ *
+ * <p>
+ * For completeness, all attributes and directives declared on the package entry
+ * are preserved in their respective maps, so no information is lost even for
+ * qualifiers this class does not interpret directly (e.g. {@code uses:=},
+ * {@code x-internal:=}, {@code mandatory}, etc.).
+ * </p>
  */
-import java.util.Objects;
-
 public final class UpdateSitePackageRequirement {
-    public final String packageName;
-    public final VersionRange versionRange;   // parsed; null when absent
-    public final boolean optional;
 
-    public UpdateSitePackageRequirement(String packageName, String version, boolean optional) {
-        this.packageName = packageName;
-        this.versionRange = VersionRange.parse(version);
-        this.optional = optional;
-    }
+	/** The package name. */
+	public final String packageName;
 
-    @Override
-    public boolean equals(Object o) {
-        if (this == o) return true;
-        if (!(o instanceof UpdateSitePackageRequirement other)) return false;
-        return optional == other.optional
-            && packageName.equals(other.packageName)
-            && Objects.equals(versionRange, other.versionRange);
-    }
+	/**
+	 * All attribute name/value pairs declared on this package entry (e.g.
+	 * {@code version}, {@code bundle-symbolic-name}, {@code mandatory}).
+	 * Unmodifiable. The {@code version} is also mirrored here.
+	 */
+	public final Map<String, String> attributes;
 
-    @Override
-    public int hashCode() {
-        int result = packageName.hashCode();
-        result = 31 * result + Objects.hashCode(versionRange);
-        result = 31 * result + (optional ? 1231 : 1237);
-        return result;
-    }
+	/**
+	 * All directive name/value pairs declared on this package entry (e.g.
+	 * {@code resolution}, {@code uses}, {@code x-internal}). Unmodifiable.
+	 */
+	public final Map<String, String> directives;
 
-    @Override
-    public String toString() {
-        return "UpdateSitePackageRequirement{"
-            + "packageName='" + packageName + '\''
-            + ", versionRange=" + versionRange
-            + ", optional=" + optional
-            + '}';
-    }
+	/**
+	 * Creates a package requirement with the given attributes and directives.
+	 *
+	 * @param packageName the package name
+	 * @param attributes  all attribute name/value pairs (may be {@code null})
+	 * @param directives  all directive name/value pairs (may be {@code null})
+	 */
+	public UpdateSitePackageRequirement(String packageName, Map<String, String> attributes,
+			Map<String, String> directives) {
+		this.packageName = Objects.requireNonNull(packageName, "packageName");
+		this.attributes = Map.copyOf(attributes == null ? Map.of() : attributes);
+		this.directives = Map.copyOf(directives == null ? Map.of() : directives);
+	}
+
+	/**
+	 * The parsed {@code version} attribute, or {@link VersionRange#any()} if
+	 * absent.
+	 */
+	public VersionRange getVersionRange() {
+		return VersionRange.parse(attributes.get(OsgiHeaders.VERSION));
+	}
+
+	/**
+	 * @return Whether this package dependency is declared as optional
+	 */
+	public boolean isOptional() {
+		return OsgiHeaders.OPTIONAL.equals(directives.get(OsgiHeaders.RESOLUTION));
+	}
+
+	@Override
+	public boolean equals(Object o) {
+		if (this == o)
+			return true;
+		if (!(o instanceof UpdateSitePackageRequirement other))
+			return false;
+		return packageName.equals(other.packageName) && attributes.equals(other.attributes)
+				&& directives.equals(other.directives);
+	}
+
+	@Override
+	public String toString() {
+		return "UpdateSitePackageRequirement{" + "packageName='" + packageName + '\'' + ", attributes=" + attributes
+				+ ", directives=" + directives + '}';
+	}
 }
