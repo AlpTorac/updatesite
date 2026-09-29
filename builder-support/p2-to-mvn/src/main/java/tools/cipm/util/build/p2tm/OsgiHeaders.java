@@ -1,4 +1,4 @@
-package tools.cipm.util.build.p2tm.updatesiteparse;
+package tools.cipm.util.build.p2tm;
 
 /**
  * Central constants for OSGi manifest header names and their attribute /
