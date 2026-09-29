@@ -9,13 +9,6 @@ import java.util.Objects;
  * packages will contain the name of the exported package.
  *
  * <p>
- * Each {@code Coordinate} represents <em>one</em> exported package, so a bundle
- * that exports several packages is represented by several {@code Coordinate}
- * instances that share the same {@code groupId}, {@code artifactId},
- * {@code version} and {@code bundleName} but differ in {@code packageName}.
- * </p>
- *
- * <p>
  * This class can be used both to look up the bundle providing an
  * {@code Import-Package} dependency (via {@link #packageName}) and to resolve
  * whole-bundle dependencies (via {@link #bundleName}).
