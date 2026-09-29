@@ -14,6 +14,7 @@ import java.util.Set;
 import java.util.jar.JarFile;
 import java.util.stream.Collectors;
 
+import tools.cipm.util.build.p2tm.FileConstants;
 import tools.cipm.util.build.p2tm.OsgiHeaders;
 
 /**
@@ -21,9 +22,6 @@ import tools.cipm.util.build.p2tm.OsgiHeaders;
  * of {@link Coordinate}s.
  */
 public final class MvnRepositoryIndex {
-
-	private static final String JAR_EXTENSION = ".jar";
-
 	/**
 	 * Only for artifacts whose "bundle name" is a repository convention and not
 	 * discoverable from the artifact itself (e.g. plain non-OSGi jars that have no
@@ -70,7 +68,8 @@ public final class MvnRepositoryIndex {
 		var coordinates = new HashSet<Coordinate>();
 
 		try (var stream = Files.walk(relativeLocalMavenRepoRootPath)) {
-			stream.filter(Files::isRegularFile).filter(path -> path.getFileName().toString().endsWith(JAR_EXTENSION))
+			stream.filter(Files::isRegularFile)
+					.filter(path -> path.getFileName().toString().endsWith(FileConstants.JAR_FILE_EXTENSION))
 					.forEach(jarPath -> coordinates.addAll(coordinatesFor(jarPath, relativeLocalMavenRepoRootPath)));
 		} catch (IOException e) {
 			e.printStackTrace();
@@ -112,8 +111,9 @@ public final class MvnRepositoryIndex {
 
 		String fileName = jarPath.getFileName().toString();
 		String version = versionDir;
-		if (fileName.startsWith(artifactId + "-") && fileName.endsWith(JAR_EXTENSION)) {
-			version = fileName.substring(artifactId.length() + 1, fileName.length() - JAR_EXTENSION.length());
+		if (fileName.startsWith(artifactId + "-") && fileName.endsWith(FileConstants.JAR_FILE_EXTENSION)) {
+			version = fileName.substring(artifactId.length() + 1,
+					fileName.length() - FileConstants.JAR_FILE_EXTENSION.length());
 		}
 
 		// --- bundle name (manifest, or curated override, or artifactId fallback) ---
