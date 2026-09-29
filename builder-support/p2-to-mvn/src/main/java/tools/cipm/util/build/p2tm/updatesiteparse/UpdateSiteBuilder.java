@@ -50,13 +50,13 @@ public final class UpdateSiteBuilder {
 		P2Repository repo = P2Repository.getInstance(URI.create(repositoryUri), logger);
 
 		Map<String, UpdateSiteBundle> bundlesByName = new LinkedHashMap<>();
-		Map<UpdateSitePackageRequirement, List<UpdateSiteBundle>> packagesToBundles = new LinkedHashMap<>();
+		Map<UpdateSitePackage, List<UpdateSiteBundle>> packagesToBundles = new LinkedHashMap<>();
 
 		for (P2Bundle p2 : repo.getBundles()) {
 			UpdateSiteBundle UpdateSiteBundle = parseRemoteBundle(p2);
 			bundlesByName.put(UpdateSiteBundle.symbolicName, UpdateSiteBundle);
 
-			for (UpdateSitePackageRequirement pkg : UpdateSiteBundle.exportedPackages) {
+			for (UpdateSitePackage pkg : UpdateSiteBundle.exportedPackages) {
 				packagesToBundles.computeIfAbsent(pkg, k -> new ArrayList<>()).add(UpdateSiteBundle);
 			}
 		}
@@ -76,12 +76,12 @@ public final class UpdateSiteBuilder {
 		P2Repository repo = P2Repository.getInstance(URI.create(repositoryUri), logger);
 
 		Map<String, UpdateSiteBundle> bundlesByName = new LinkedHashMap<>();
-		Map<UpdateSitePackageRequirement, List<UpdateSiteBundle>> packagesToBundles = new LinkedHashMap<>();
+		Map<UpdateSitePackage, List<UpdateSiteBundle>> packagesToBundles = new LinkedHashMap<>();
 
 		for (P2Bundle p2 : repo.getBundles()) {
 			UpdateSiteBundle bundle = parseLocalBundle(p2, localCloneRoot);
 			bundlesByName.put(bundle.symbolicName, bundle);
-			for (UpdateSitePackageRequirement pkg : bundle.exportedPackages) {
+			for (UpdateSitePackage pkg : bundle.exportedPackages) {
 				packagesToBundles.computeIfAbsent(pkg, k -> new ArrayList<>()).add(bundle);
 			}
 		}
@@ -106,8 +106,8 @@ public final class UpdateSiteBuilder {
 			Map<String, String> headers = ManifestReader.readManifest(is);
 
 			List<Dependency> required = ManifestReader.readRequiredBundles(headers);
-			List<UpdateSitePackageRequirement> imported = ManifestReader.readImportedPackages(headers);
-			List<UpdateSitePackageRequirement> exported = ManifestReader.readExportedPackages(headers);
+			List<UpdateSitePackage> imported = ManifestReader.readImportedPackages(headers);
+			List<UpdateSitePackage> exported = ManifestReader.readExportedPackages(headers);
 
 			String symbolicName = ManifestReader.readBundleSymbolicName(headers).orElse(p2.getId());
 

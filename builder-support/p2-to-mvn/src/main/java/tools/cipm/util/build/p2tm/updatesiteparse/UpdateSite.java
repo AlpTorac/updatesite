@@ -26,10 +26,10 @@ public final class UpdateSite {
 	public final Map<String, UpdateSiteBundle> bundlesByName;
 
 	/** Every exported package -> the UpdateSiteBundle(s) that export it. */
-	public final Map<UpdateSitePackageRequirement, List<UpdateSiteBundle>> packagesToBundles;
+	public final Map<UpdateSitePackage, List<UpdateSiteBundle>> packagesToBundles;
 
 	public UpdateSite(String repositoryUri, Map<String, UpdateSiteBundle> bundlesByName,
-			Map<UpdateSitePackageRequirement, List<UpdateSiteBundle>> packagesToBundles) {
+			Map<UpdateSitePackage, List<UpdateSiteBundle>> packagesToBundles) {
 		this.repositoryUri = repositoryUri;
 		this.bundlesByName = Map.copyOf(bundlesByName);
 		this.packagesToBundles = packagesToBundles;

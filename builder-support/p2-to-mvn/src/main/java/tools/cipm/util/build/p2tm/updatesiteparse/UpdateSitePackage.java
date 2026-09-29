@@ -22,7 +22,7 @@ import tools.cipm.util.build.p2tm.OsgiHeaders;
  * {@code x-internal:=}, {@code mandatory}, etc.).
  * </p>
  */
-public final class UpdateSitePackageRequirement {
+public final class UpdateSitePackage {
 
 	/** The package name. */
 	public final String packageName;
@@ -47,7 +47,7 @@ public final class UpdateSitePackageRequirement {
 	 * @param attributes  all attribute name/value pairs (may be {@code null})
 	 * @param directives  all directive name/value pairs (may be {@code null})
 	 */
-	public UpdateSitePackageRequirement(String packageName, Map<String, String> attributes,
+	public UpdateSitePackage(String packageName, Map<String, String> attributes,
 			Map<String, String> directives) {
 		this.packageName = Objects.requireNonNull(packageName, "packageName");
 		this.attributes = Map.copyOf(attributes == null ? Map.of() : attributes);
@@ -73,7 +73,7 @@ public final class UpdateSitePackageRequirement {
 	public boolean equals(Object o) {
 		if (this == o)
 			return true;
-		if (!(o instanceof UpdateSitePackageRequirement other))
+		if (!(o instanceof UpdateSitePackage other))
 			return false;
 		return packageName.equals(other.packageName) && attributes.equals(other.attributes)
 				&& directives.equals(other.directives);

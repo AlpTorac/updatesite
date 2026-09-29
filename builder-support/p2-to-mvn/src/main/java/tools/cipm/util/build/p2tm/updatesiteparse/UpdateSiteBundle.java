@@ -7,11 +7,11 @@ public final class UpdateSiteBundle {
 	public final String version;
 	public final String uri;
 	public final List<Dependency> requiredBundles;
-	public final List<UpdateSitePackageRequirement> importedPackages;
-	public final List<UpdateSitePackageRequirement> exportedPackages;
+	public final List<UpdateSitePackage> importedPackages;
+	public final List<UpdateSitePackage> exportedPackages;
 
 	public UpdateSiteBundle(String symbolicName, String version, String uri, List<Dependency> requiredBundles,
-			List<UpdateSitePackageRequirement> importedPackages, List<UpdateSitePackageRequirement> exportedPackages) {
+			List<UpdateSitePackage> importedPackages, List<UpdateSitePackage> exportedPackages) {
 		this.symbolicName = symbolicName;
 		this.version = version;
 		this.uri = uri;
