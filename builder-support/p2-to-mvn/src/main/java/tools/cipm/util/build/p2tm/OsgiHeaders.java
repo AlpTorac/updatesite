@@ -30,6 +30,7 @@ public final class OsgiHeaders {
 	public static final String MANDATORY = "mandatory";
 
 	// Directives
+	public static final String SINGLETON = "singleton";
 	public static final String RESOLUTION = "resolution";
 	public static final String USES = "uses";
 	public static final String OPTIONAL = "optional";

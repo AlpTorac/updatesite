@@ -2,17 +2,16 @@ package tools.cipm.util.build.p2tm.updatesiteparse;
 
 import java.util.Map;
 
-import tools.cipm.util.build.p2tm.OsgiHeaders;
-
 /**
  * An abstract class for classes that represent {@link ManifestElement}
  * instances.
  */
-public abstract class InMemoryManifestElementRepresentation {
+public abstract class InMemoryManifestElementRepresentation extends InMemoryManifestRepresentation {
+
 	/**
 	 * All attribute name/value pairs declared on this package entry (e.g.
 	 * {@code version}, {@code bundle-symbolic-name}, {@code mandatory}).
-	 * Unmodifiable. The {@code version} is also mirrored here.
+	 * Unmodifiable.
 	 */
 	public final Map<String, String> attributes;
 
@@ -34,18 +33,11 @@ public abstract class InMemoryManifestElementRepresentation {
 	}
 
 	/**
-	 * The parsed {@code version} attribute, or {@link VersionRange#any()} if
-	 * absent.
+	 * Creates an instance with no attributes nor directives (their Map values will
+	 * still be non-null).
 	 */
-	public VersionRange getVersionRange() {
-		return VersionRange.parse(attributes.get(OsgiHeaders.VERSION));
-	}
-
-	/**
-	 * @return Whether this package dependency is declared as optional
-	 */
-	public boolean isOptional() {
-		return OsgiHeaders.OPTIONAL.equals(directives.get(OsgiHeaders.RESOLUTION));
+	public InMemoryManifestElementRepresentation() {
+		this(null, null);
 	}
 
 	@Override

@@ -71,19 +71,34 @@ public final class ManifestReader {
 	}
 
 	/**
-	 * Reads the {@code Bundle-SymbolicName} header, dropping any parameters after a
-	 * {@code ';'} (e.g. {@code ;singleton:=true}).
+	 * Reads and parses the {@code Bundle-SymbolicName} header, returning its value
+	 * together with all associated attributes and directives.
+	 *
+	 * <p>
+	 * For a header such as {@code org.foo;singleton:=true}, the returned
+	 * {@link BundleSymbolicNameData#symbolicName()} is {@code org.foo} and
+	 * {@code directives} contains {@code singleton -> true}.
+	 * </p>
 	 *
 	 * @param manifest the parsed manifest headers
-	 * @return the clean symbolic name, or empty if absent or blank
+	 * @return the parsed symbolic-name data, or empty if the header is absent or
+	 *         blank
 	 */
-	public static Optional<String> readBundleSymbolicName(Map<String, String> manifest) {
-		String bsn = manifest.get(OsgiHeaders.BUNDLE_SYMBOLIC_NAME);
-		if (bsn == null || bsn.isBlank()) {
+	public static Optional<BundleSymbolicNameData> readBundleSymbolicName(Map<String, String> manifest) {
+		String value = manifest.get(OsgiHeaders.BUNDLE_SYMBOLIC_NAME);
+		if (value == null || value.isBlank()) {
 			return Optional.empty();
 		}
-		int semi = bsn.indexOf(';');
-		return Optional.of((semi == -1) ? bsn.trim() : bsn.substring(0, semi).trim());
+		ManifestElement[] elements = parseHeader(OsgiHeaders.BUNDLE_SYMBOLIC_NAME, value);
+		if (elements == null || elements.length == 0) {
+			return Optional.empty();
+		}
+		// There should always only be up to one element, hence no iteration over all
+		// elements.
+		ManifestElement el = elements[0];
+		var bsnd = new BundleSymbolicNameData(el.getValue(), collectAttributes(el), collectDirectives(el));
+		bsnd.setEntireManifest(manifest);
+		return Optional.of(bsnd);
 	}
 
 	/**
@@ -99,7 +114,9 @@ public final class ManifestReader {
 		}
 		List<BundleDependency> result = new ArrayList<>();
 		for (ManifestElement el : parseHeader(OsgiHeaders.REQUIRE_BUNDLE, value)) {
-			result.add(parseBundleDependency(el));
+			var dep = parseBundleDependency(el);
+			dep.setEntireManifest(manifest);
+			result.add(dep);
 		}
 		return result;
 	}
@@ -117,7 +134,9 @@ public final class ManifestReader {
 		}
 		List<UpdateSitePackage> result = new ArrayList<>();
 		for (ManifestElement el : parseHeader(OsgiHeaders.IMPORT_PACKAGE, value)) {
-			result.add(parsePackageRequirement(el));
+			var pac = parsePackageRequirement(el);
+			pac.setEntireManifest(manifest);
+			result.add(pac);
 		}
 		return result;
 	}
@@ -140,7 +159,9 @@ public final class ManifestReader {
 		}
 		List<UpdateSitePackage> result = new ArrayList<>();
 		for (ManifestElement el : parseHeader(OsgiHeaders.EXPORT_PACKAGE, value)) {
-			result.add(parsePackageRequirement(el));
+			var pac = parsePackageRequirement(el);
+			pac.setEntireManifest(manifest);
+			result.add(pac);
 		}
 		return result;
 	}
