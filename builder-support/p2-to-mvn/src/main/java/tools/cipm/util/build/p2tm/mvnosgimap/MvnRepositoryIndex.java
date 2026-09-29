@@ -14,14 +14,14 @@ import java.util.Set;
 import java.util.jar.JarFile;
 import java.util.stream.Collectors;
 
+import tools.cipm.util.build.p2tm.OsgiHeaders;
+
 /**
  * Builds a flat, complete index of the local Maven repository as a single list
  * of {@link Coordinate}s.
  */
 public final class MvnRepositoryIndex {
-	private static final String EXPORT_PACKAGE = "Export-Package";
-	private static final String REQUIRE_BUNDLE = "Require-Bundle";
-	private static final String BUNDLE_SYMBOLIC_NAME = "Bundle-SymbolicName";
+
 	private static final String JAR_EXTENSION = ".jar";
 
 	/**
@@ -148,7 +148,7 @@ public final class MvnRepositoryIndex {
 			if (manifest == null)
 				return List.of();
 
-			String exportPackages = manifest.getMainAttributes().getValue(EXPORT_PACKAGE);
+			String exportPackages = manifest.getMainAttributes().getValue(OsgiHeaders.EXPORT_PACKAGE);
 			if (exportPackages == null || exportPackages.isBlank())
 				return List.of();
 
@@ -184,7 +184,7 @@ public final class MvnRepositoryIndex {
 			if (manifest == null) {
 				return Optional.empty();
 			}
-			String bsn = manifest.getMainAttributes().getValue(BUNDLE_SYMBOLIC_NAME);
+			String bsn = manifest.getMainAttributes().getValue(OsgiHeaders.BUNDLE_SYMBOLIC_NAME);
 			if (bsn == null || bsn.isBlank()) {
 				return Optional.empty();
 			}

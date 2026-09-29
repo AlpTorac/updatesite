@@ -22,6 +22,8 @@ import org.osgi.framework.BundleException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import tools.cipm.util.build.p2tm.OsgiHeaders;
+
 /**
  * Builds a complete {@link UpdateSite} by combining p2-layout-resolver
  * (UpdateSiteBundle enumeration) with org.eclipse.osgi.util.ManifestElement
