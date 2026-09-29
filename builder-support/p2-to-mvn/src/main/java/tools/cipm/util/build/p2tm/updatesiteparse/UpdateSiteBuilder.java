@@ -22,6 +22,7 @@ import org.osgi.framework.BundleException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import tools.cipm.util.build.p2tm.FileConstants;
 import tools.cipm.util.build.p2tm.OsgiHeaders;
 
 /**
@@ -30,10 +31,6 @@ import tools.cipm.util.build.p2tm.OsgiHeaders;
  * (accurate manifest parsing).
  */
 public final class UpdateSiteBuilder {
-	private static final String JAR_EXTENSION = ".jar";
-
-//	private static final String BUNDLE_SYMBOLIC_NAME = "Bundle-SymbolicName";
-
 	private static final Logger logger = LoggerFactory.getLogger(UpdateSiteBuilder.class);
 
 	private final HttpClient http;
@@ -74,7 +71,7 @@ public final class UpdateSiteBuilder {
 	 */
 	public UpdateSite buildLocal(String localCloneRoot) throws IOException {
 		// P2Repository handles file:// transparently via P2Util (non-HTTP branch).
-		String repositoryUri = "file://" + Paths.get(localCloneRoot).toAbsolutePath() + "/";
+		String repositoryUri = FileConstants.URI_FILE_PREFIX + Paths.get(localCloneRoot).toAbsolutePath() + "/";
 		P2Repository repo = P2Repository.getInstance(URI.create(repositoryUri), logger);
 
 		Map<String, UpdateSiteBundle> bundlesByName = new LinkedHashMap<>();
@@ -99,7 +96,7 @@ public final class UpdateSiteBuilder {
 
 	private static UpdateSiteBundle parseBundle(P2Bundle p2, Path jarPath, boolean deleteJARFile) {
 		try (JarFile jar = new JarFile(jarPath.toFile())) {
-			InputStream is = jar.getInputStream(jar.getJarEntry("META-INF/MANIFEST.MF"));
+			InputStream is = jar.getInputStream(jar.getJarEntry(FileConstants.JAR_MANIFEST_PATH));
 			// ManifestElement.parseBundleManifest fills a Map<String,String> of
 			// raw header values (no localization; just raw OSGi headers).
 			Map<String, String> headers = parseBundleManifest(is);
@@ -149,7 +146,7 @@ public final class UpdateSiteBuilder {
 	}
 
 	private Path downloadToTemp(String uri) throws IOException, InterruptedException {
-		Path tmp = Files.createTempFile("p2bundle", JAR_EXTENSION);
+		Path tmp = Files.createTempFile("p2bundle", FileConstants.JAR_FILE_EXTENSION);
 		HttpResponse<Path> resp = http.send(HttpRequest.newBuilder(URI.create(uri)).GET().build(),
 				HttpResponse.BodyHandlers.ofFile(tmp));
 		if (resp.statusCode() != 200) {

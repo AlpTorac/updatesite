@@ -1,7 +1,6 @@
 package tools.cipm.util.build.p2tm.updatesiteparse;
 
 import java.util.List;
-import java.util.Objects;
 
 public final class UpdateSiteBundle {
     public final String symbolicName;

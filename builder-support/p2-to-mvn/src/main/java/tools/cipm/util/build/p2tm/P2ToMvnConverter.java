@@ -24,131 +24,116 @@ import tools.cipm.util.build.p2tm.updatesiteparse.UpdateSite;
 import tools.cipm.util.build.p2tm.updatesiteparse.UpdateSiteBuilder;
 
 public class P2ToMvnConverter {
-    private static final Logger logger = LoggerFactory.getLogger(P2ToMvnConverter.class);
-    private static final String JAR_FILE_EXTENSION = ".jar";
-    private static final String URI_FILE_PREFIX = "file://";
-    private static final String URI_HTTP_SCHEME = "http";
-    private static final String URI_HTTPS_SCHEME = "https";
+	private static final Logger logger = LoggerFactory.getLogger(P2ToMvnConverter.class);
 
-    public static void main(String[] args) {
-        // installJarsFromLocalDirectory();
-        // installJarsFromRemoteRepository();
-        // installJarsFromRepository("", URI_FILE_PREFIX + "", true);
-    }
+	public static void main(String[] args) {
+		// installJarsFromLocalDirectory();
+		// installJarsFromRemoteRepository();
+		// installJarsFromRepository("", FileConstants.URI_FILE_PREFIX + "", true);
+	}
 
-    private static void installJarsFromLocalDirectory() {
-        var consideredPath = Paths.get("target", "jars");
-        if (Files.notExists(consideredPath)) {
-            System.out.println("Cannot consider the directory. It does not exist.");
-            return;
-        }
+	private static void installJarsFromLocalDirectory() {
+		var consideredPath = Paths.get(FileConstants.TARGET_DIR_NAME, FileConstants.TARGET_JARS_DIR_NAME);
+		if (Files.notExists(consideredPath)) {
+			System.out.println("Cannot consider the directory. It does not exist.");
+			return;
+		}
 
-        try(var scanner = new Scanner(System.in)) {
-            var lastGroupIdContainer = new StringBuilder();
-            Files
-                .walk(consideredPath)
-                .filter(Files::isRegularFile)
-                .forEach(path -> {
-                    var fileName = path.getFileName().toString();
-                    if (!fileName.endsWith(JAR_FILE_EXTENSION)) {
-                        return;
-                    }
+		try (var scanner = new Scanner(System.in)) {
+			var lastGroupIdContainer = new StringBuilder();
+			Files.walk(consideredPath).filter(Files::isRegularFile).forEach(path -> {
+				var fileName = path.getFileName().toString();
+				if (!fileName.endsWith(FileConstants.JAR_FILE_EXTENSION)) {
+					return;
+				}
 
-                    var fileNameParts = fileName.split("_");
+				var fileNameParts = fileName.split("_");
 
-                    System.out.println("You need to specify a group ID for the artifact "
-                        + fileName + ". Please enter it. Leave the ID empty if the last group ID "
-                        + lastGroupIdContainer.toString() + " should be reused.");
-                    var potentialGroupId = scanner.next();
-                    if (!potentialGroupId.isBlank()) {
-                        lastGroupIdContainer.delete(0, lastGroupIdContainer.length());
-                        lastGroupIdContainer.append(potentialGroupId);
-                    }
+				System.out.println("You need to specify a group ID for the artifact " + fileName
+						+ ". Please enter it. Leave the ID empty if the last group ID "
+						+ lastGroupIdContainer.toString() + " should be reused.");
+				var potentialGroupId = scanner.next();
+				if (!potentialGroupId.isBlank()) {
+					lastGroupIdContainer.delete(0, lastGroupIdContainer.length());
+					lastGroupIdContainer.append(potentialGroupId);
+				}
 
-                    try {
-                        installJarLocally(
-                            path.toString(),
-                            lastGroupIdContainer.toString(),
-                            fileNameParts[0],
-                            fileNameParts[1].substring(0, fileNameParts[1].length() - JAR_FILE_EXTENSION.length())
-                        );
-                    } catch(IOException | InterruptedException e) {
-                        System.out.println("Could not process " + fileName);
-                    }
-                });
-        } catch(IOException e) {
-            e.printStackTrace();
-        }
-    }
+				try {
+					installJarLocally(path.toString(), lastGroupIdContainer.toString(), fileNameParts[0],
+							fileNameParts[1].substring(0,
+									fileNameParts[1].length() - FileConstants.JAR_FILE_EXTENSION.length()));
+				} catch (IOException | InterruptedException e) {
+					System.out.println("Could not process " + fileName);
+				}
+			});
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
+	}
 
-    private static void installJarsFromRemoteRepository() {
-        String id = System.getProperty("p2tm.id");
-        String repoUri = System.getProperty("p2tm.uri");
-        if (id == null || repoUri == null) {
-            System.out.println("No Id or URI given. Stopping.");
-            return;
-        }
+	private static void installJarsFromRemoteRepository() {
+		String id = System.getProperty("p2tm.id");
+		String repoUri = System.getProperty("p2tm.uri");
+		if (id == null || repoUri == null) {
+			System.out.println("No Id or URI given. Stopping.");
+			return;
+		}
 
-        installJarsFromRepository(id, repoUri, false);
-    }
+		installJarsFromRepository(id, repoUri, false);
+	}
 
-    private static void installJarsFromRepository(String id, String repoUri, boolean isLocal) {
-        P2Repository p2Repo = P2Repository.getInstance(URI.create(repoUri), logger);
-        var allBundles = p2Repo.getBundles();
+	private static void installJarsFromRepository(String id, String repoUri, boolean isLocal) {
+		P2Repository p2Repo = P2Repository.getInstance(URI.create(repoUri), logger);
+		var allBundles = p2Repo.getBundles();
 
-        HttpClient client = HttpClient.newHttpClient();
-        for (var bundle : allBundles) {
-            System.out.println("Downloading " + bundle.getId());
+		HttpClient client = HttpClient.newHttpClient();
+		for (var bundle : allBundles) {
+			System.out.println("Downloading " + bundle.getId());
 
-            try {
-                if (isLocal) {
-                    var bundleUri = bundle.getUri("");
-                    if (!URI_HTTP_SCHEME.equals(bundleUri.getScheme())
-                            && !URI_HTTPS_SCHEME.equals(bundleUri.getScheme())
-                            && Files.exists(Paths.get(bundleUri))) {
-                        installJarLocally(bundleUri.getSchemeSpecificPart(), id, bundle.getId(), bundle.getVersion());
-                    }
-                    continue;
-                }
+			try {
+				if (isLocal) {
+					var bundleUri = bundle.getUri("");
+					if (!FileConstants.URI_HTTP_SCHEME.equals(bundleUri.getScheme())
+							&& !FileConstants.URI_HTTPS_SCHEME.equals(bundleUri.getScheme())
+							&& Files.exists(Paths.get(bundleUri))) {
+						installJarLocally(bundleUri.getSchemeSpecificPart(), id, bundle.getId(), bundle.getVersion());
+					}
+					continue;
+				}
 
-                var tempStorageFile = Paths.get("target", bundle.getId() + "_" + bundle.getVersion() + ".jar");
+				var tempStorageFile = Paths.get(FileConstants.TARGET_DIR_NAME,
+						bundle.getId() + "_" + bundle.getVersion() + FileConstants.JAR_FILE_EXTENSION);
 
-                if (Files.notExists(tempStorageFile)) {
-                    var bodyHandler = BodyHandlers.ofFile(tempStorageFile);
-                    client.send(
-                        HttpRequest.newBuilder(bundle.getUri("")).GET().build(),
-                        bodyHandler
-                    );
-                }
+				if (Files.notExists(tempStorageFile)) {
+					var bodyHandler = BodyHandlers.ofFile(tempStorageFile);
+					client.send(HttpRequest.newBuilder(bundle.getUri("")).GET().build(), bodyHandler);
+				}
 
-                installJarLocally(tempStorageFile.toString(), id, bundle.getId(), bundle.getVersion());
+				installJarLocally(tempStorageFile.toString(), id, bundle.getId(), bundle.getVersion());
 
-                Files.delete(tempStorageFile);
-            } catch (IOException | InterruptedException e) {
-                e.printStackTrace();
-            }
-        }
-    }
+				Files.delete(tempStorageFile);
+			} catch (IOException | InterruptedException e) {
+				e.printStackTrace();
+			}
+		}
+	}
 
-    private static void installJarLocally(String filePath, String groupId, String artifactId, String version) throws IOException, InterruptedException {
-        // Only supports Linux for now.
-    	
+	private static void installJarLocally(String filePath, String groupId, String artifactId, String version)
+			throws IOException, InterruptedException {
+		// Only supports Linux for now.
+
 		/*
 		 * TODO Use getTransitiveDependencyPOMString(...) in order to generate the POM
 		 * file for transitive dependencies. Then include the generated POM in the
 		 * process below.
 		 */
-    	
-        var subProcess = new ProcessBuilder(
-            "./mvnw", "install:install-file", "-DlocalRepositoryPath=../mvn",
-            "-Dfile=" + filePath, "-DgroupId=" + groupId,
-            "-DartifactId=" + artifactId, "-Dversion=" + version,
-            "-Dpackaging=jar", "-DcreateChecksum=true")
-            .inheritIO()
-            .start();
-        var subProcessResult = subProcess.waitFor();
-        System.out.println(subProcessResult);
-    }
+
+		var subProcess = new ProcessBuilder("./mvnw", "install:install-file", "-DlocalRepositoryPath=../mvn",
+				"-Dfile=" + filePath, "-DgroupId=" + groupId, "-DartifactId=" + artifactId, "-Dversion=" + version,
+				"-Dpackaging=jar", "-DcreateChecksum=true").inheritIO().start();
+		var subProcessResult = subProcess.waitFor();
+		System.out.println(subProcessResult);
+	}
 
 	/**
 	 * Generates the String content of the POM file, which declares all transitive
