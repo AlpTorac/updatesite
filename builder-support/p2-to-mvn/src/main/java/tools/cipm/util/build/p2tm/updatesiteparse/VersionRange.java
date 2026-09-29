@@ -9,7 +9,9 @@ import java.util.Objects;
  * Supports both OSGi and Maven range syntax, e.g.
  * </p>
  * <ul>
- * <li>{@code 1.2.3} — a single (exact) version, no bounds</li>
+ * <li>{@code 1.2.3} — a single (exact) version, no bounds. Exact versions are
+ * internally stored as the lower version and the upper version is null in that
+ * case</li>
  * <li>{@code [1.0,2.0)} — inclusive lower, exclusive upper</li>
  * <li>{@code [1.0,2.0]} — inclusive both</li>
  * <li>{@code (1.0,2.0)} — exclusive both</li>
@@ -18,8 +20,13 @@ import java.util.Objects;
  * </ul>
  */
 public final class VersionRange {
+	/**
+	 * A constant instance that represents a version range that matches all
+	 * versions.
+	 */
+	public static final VersionRange ANY = new VersionRange("0", true, null, false, true);
 
-	private final String lowerVersion; // may be null when unbounded
+	private final String lowerVersion; // may be null when unbounded, exact versions are stored here
 	private final boolean includeLower; // Whether lowerVersion is inclusive
 	private final String upperVersion; // may be null when unbounded
 	private final boolean includeUpper; // Whether upperVersion is inclusive
@@ -40,7 +47,7 @@ public final class VersionRange {
 	 * @return a range matching any version
 	 */
 	public static VersionRange any() {
-		return new VersionRange("0", true, null, false, true);
+		return ANY;
 	}
 
 	/**
@@ -148,6 +155,63 @@ public final class VersionRange {
 	 */
 	public boolean isBounded() {
 		return bounded;
+	}
+
+	/**
+	 * Checks whether the given version string lies within this range.
+	 *
+	 * <p>
+	 * The comparison is performed as a string-based lexical comparison against this
+	 * range's bounds:
+	 * </p>
+	 * <ul>
+	 * <li>If this range is {@link #any()}, the version is considered in range (any
+	 * version matches).</li>
+	 * <li>If the given version is equal to an inclusive bound, it is in range.</li>
+	 * <li>Otherwise, the version must fall strictly between a lower and an upper
+	 * bound (inclusive or exclusive per the bound markers).</li>
+	 * </ul>
+	 *
+	 * @param versionString the version to check; may be {@code null}
+	 * @return {@code true} if the version is within this range, {@code false}
+	 *         otherwise
+	 */
+	public boolean inRange(String versionString) {
+		// The "any" range matches every version.
+		if (isAny(this)) {
+			return true;
+		}
+
+		if (versionString == null) {
+			return false;
+		}
+
+		// Bounded ranges compare against both bounds.
+		if (bounded) {
+			if (lowerVersion != null) {
+				int lowerCmp = versionString.compareTo(lowerVersion);
+				if (lowerCmp < 0 || (lowerCmp == 0 && !includeLower)) {
+					return false;
+				}
+			}
+			if (upperVersion != null) {
+				int upperCmp = versionString.compareTo(upperVersion);
+				if (upperCmp > 0 || (upperCmp == 0 && !includeUpper)) {
+					return false;
+				}
+			}
+			return true;
+		}
+
+		// An unbounded single-version range: exact equality only.
+		return versionString.equals(lowerVersion);
+	}
+
+	/**
+	 * @return Whether the given VersionRange is {@link #ANY}
+	 */
+	public static boolean isAny(VersionRange range) {
+		return range == ANY;
 	}
 
 	@Override
