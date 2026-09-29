@@ -172,6 +172,12 @@ public final class VersionRange {
 	 * bound (inclusive or exclusive per the bound markers).</li>
 	 * </ul>
 	 *
+	 * <p>
+	 * FIXME Check whether version compatibility can actually be computed like this.
+	 * Since different versions follow different conventions, a lexical comparison
+	 * may not always suffice. This method was provided as a best-effort version
+	 * compatibility check.
+	 *
 	 * @param versionString the version to check; may be {@code null}
 	 * @return {@code true} if the version is within this range, {@code false}
 	 *         otherwise
