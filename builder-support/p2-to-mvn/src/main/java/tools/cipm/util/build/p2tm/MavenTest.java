@@ -19,6 +19,11 @@ import tools.cipm.util.build.p2tm.updatesiteparse.UpdateSite;
 import tools.cipm.util.build.p2tm.updatesiteparse.UpdateSiteBuilder;
 import tools.cipm.util.build.p2tm.updatesiteparse.UpdateSiteBundle;
 
+/**
+ * A test class that demonstrates how {@link UpdateSite} and
+ * {@link MvnRepositoryIndex} can be utilised via
+ * {@link TransitiveDependencyResolver}.
+ */
 public class MavenTest {
 	private static final Logger logger = LoggerFactory.getLogger(MavenTest.class);
 

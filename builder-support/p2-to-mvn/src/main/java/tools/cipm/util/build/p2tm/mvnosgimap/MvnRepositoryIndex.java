@@ -17,7 +17,10 @@ import tools.cipm.util.build.p2tm.ManifestReader;
 
 /**
  * Builds a flat, complete index of a local Maven repository as a single list of
- * {@link Coordinate}s.
+ * {@link Coordinate}s. Parses the index based on the JAR files in the local
+ * Maven repository instead of the provided items.json file, because it does not
+ * contain any information on the exported packages the individual Maven
+ * dependencies.
  * 
  * <p>
  * A call to {@link #build()} is necessary to build the Maven repository index.
