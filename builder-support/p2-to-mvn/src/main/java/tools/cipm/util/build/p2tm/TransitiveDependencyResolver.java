@@ -21,6 +21,12 @@ import tools.cipm.util.build.p2tm.updatesiteparse.UpdateSiteBundle;
 public final class TransitiveDependencyResolver {
 	private static final Logger logger = LoggerFactory.getLogger(TransitiveDependencyResolver.class);
 
+	private MvnRepositoryIndex mvnIndex;
+
+	public TransitiveDependencyResolver(MvnRepositoryIndex mvnIndex) {
+		this.mvnIndex = mvnIndex;
+	}
+
 	/**
 	 * Resolves and returns the de-duplicated transitive Maven dependencies of the
 	 * given bundle.
@@ -46,7 +52,7 @@ public final class TransitiveDependencyResolver {
 			}
 
 			// Prefer a concrete coordinate from the Maven repository.
-			var coords = MvnRepositoryIndex.findByBundleName(bundleName);
+			var coords = mvnIndex.findByBundleName(bundleName);
 			Coordinate coord = null;
 			if (!coords.isEmpty()) {
 				// Ignore the dependency, if the Maven repository does not have a JAR file for

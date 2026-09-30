@@ -5,6 +5,7 @@ import java.io.IOException;
 import java.net.URI;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 import org.junit.jupiter.api.Test;
@@ -36,7 +37,12 @@ public class MavenTest {
 		var repoPath = topDirPath.resolve("archive").resolve("cipm-0.1.1").toAbsolutePath();
 
 		// Build the Maven Repository Index
-		MvnRepositoryIndex.build(mvnDirPath);
+		//
+		// The "org.pcm.headless.api" bundle is the only exception in the local Maven
+		// repository that only declares the manifest version, hence its mapping is
+		// manually added.
+		var mvnRepo = new MvnRepositoryIndex(mvnDirPath, Map.of("api", "org.pcm.headless.api"));
+		mvnRepo.build();
 
 		// Parse the update site into an in-memory model.
 		UpdateSite updateSite;
@@ -49,7 +55,7 @@ public class MavenTest {
 		P2Repository p2Repo = P2Repository.getInstance(URI.create(updateSite.repositoryUri), logger);
 		var allBundles = p2Repo.getBundles();
 
-		TransitiveDependencyResolver resolver = new TransitiveDependencyResolver();
+		TransitiveDependencyResolver resolver = new TransitiveDependencyResolver(mvnRepo);
 
 		Set<Coordinate> allTransitiveDeps = new HashSet<>();
 

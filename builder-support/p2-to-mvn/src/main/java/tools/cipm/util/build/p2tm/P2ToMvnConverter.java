@@ -1,5 +1,6 @@
 package tools.cipm.util.build.p2tm;
 
+import java.io.File;
 import java.io.IOException;
 import java.net.URI;
 import java.net.http.HttpClient;
@@ -10,6 +11,7 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Scanner;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -26,7 +28,10 @@ import tools.cipm.util.build.p2tm.updatesiteparse.UpdateSiteBuilder;
 public class P2ToMvnConverter {
 	private static final Logger logger = LoggerFactory.getLogger(P2ToMvnConverter.class);
 
+	private static MvnRepositoryIndex mvnRepo;
+
 	public static void main(String[] args) {
+		// initMvnRepo();
 		// installJarsFromLocalDirectory();
 		// installJarsFromRemoteRepository();
 		// installJarsFromRepository("", FileConstants.URI_FILE_PREFIX + "", true);
@@ -136,6 +141,33 @@ public class P2ToMvnConverter {
 	}
 
 	/**
+	 * Initialises the local Maven repository's index, i.e. a list of all available
+	 * dependencies therein.
+	 * 
+	 * @see {@link Coordinate}
+	 */
+	private static void initMvnRepo() {
+		// Execution path
+		var currentPath = new File("").toPath().toAbsolutePath();
+
+		// The top level directory of the entire GIT repository
+		var topDirPath = currentPath.getParent().getParent();
+
+		// Relative path to local Maven repository
+		var mvnDirPath = currentPath.relativize(topDirPath.resolve("mvn"));
+
+		// Build the Maven Repository Index
+		//
+		// The "org.pcm.headless.api" bundle is the only exception in the local Maven
+		// repository that only declares the manifest version, hence its mapping is
+		// manually added.
+		mvnRepo = new MvnRepositoryIndex(mvnDirPath, Map.of("api", "org.pcm.headless.api"));
+
+		// Parse all Maven coordinates available under the local Maven repository
+		mvnRepo.build();
+	}
+
+	/**
 	 * Generates the String content of the POM file, which declares all transitive
 	 * dependencies needed for the concrete CIPM update site under
 	 * concreteUpdateSitePath. Uses the Maven repository under
@@ -168,9 +200,6 @@ public class P2ToMvnConverter {
 			Path concreteUpdateSitePath, String pomGroupID, String pomArtifactID, String pomVersion) {
 		var absConcreteUpdateSitePath = concreteUpdateSitePath.toAbsolutePath();
 
-		// Parse all Maven coordinates available under the local Maven repository
-		MvnRepositoryIndex.build(relativeLocalMvnRepoDirPath);
-
 		// Parse the concrete update site into an in-memory model.
 		UpdateSite updateSite;
 		try {
@@ -182,7 +211,7 @@ public class P2ToMvnConverter {
 		// Retrieve all P2 bundles from the parsed update site
 		var allBundles = updateSite.bundlesByName.values().stream().collect(Collectors.toList());
 
-		TransitiveDependencyResolver resolver = new TransitiveDependencyResolver();
+		TransitiveDependencyResolver resolver = new TransitiveDependencyResolver(mvnRepo);
 
 		Set<Coordinate> allTransitiveDeps = new HashSet<>();
 
