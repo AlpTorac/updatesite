@@ -43,7 +43,7 @@ public final class ManifestReader {
 	 */
 	public static Map<String, String> readManifest(Path jarPath) {
 		try (JarFile jar = new JarFile(jarPath.toFile())) {
-			InputStream is = jar.getInputStream(jar.getJarEntry(FileConstants.JAR_MANIFEST_PATH));
+			InputStream is = jar.getInputStream(jar.getJarEntry(FileConstants.JAR_MANIFEST_ENTRY_NAME));
 			// ManifestElement.parseBundleManifest fills a Map<String,String> of
 			// raw header values (no localization; just raw OSGi headers).
 			return ManifestReader.readManifest(is);

@@ -73,8 +73,8 @@ public final class UpdateSiteBuilder {
 	 */
 	public UpdateSite buildLocal(String localCloneRoot) throws IOException {
 		// P2Repository handles file:// transparently via P2Util (non-HTTP branch).
-		String repositoryUri = FileConstants.URI_FILE_PREFIX + Paths.get(localCloneRoot).toAbsolutePath() + "/";
-		P2Repository repo = P2Repository.getInstance(URI.create(repositoryUri), logger);
+		var repositoryUri = Paths.get(localCloneRoot).toAbsolutePath().toUri();
+		P2Repository repo = P2Repository.getInstance(repositoryUri, logger);
 
 		Map<String, UpdateSiteBundle> bundlesByName = new LinkedHashMap<>();
 		Map<UpdateSitePackage, List<UpdateSiteBundle>> packagesToBundles = new LinkedHashMap<>();
@@ -87,7 +87,7 @@ public final class UpdateSiteBuilder {
 			}
 		}
 
-		return new UpdateSite(repositoryUri, bundlesByName, packagesToBundles);
+		return new UpdateSite(repositoryUri.toString(), bundlesByName, packagesToBundles);
 	}
 
 	/**
@@ -101,7 +101,7 @@ public final class UpdateSiteBuilder {
 
 	private static UpdateSiteBundle parseBundle(P2Bundle p2, Path jarPath, boolean deleteJARFile) {
 		try (JarFile jar = new JarFile(jarPath.toFile())) {
-			InputStream is = jar.getInputStream(jar.getJarEntry(FileConstants.JAR_MANIFEST_PATH));
+			InputStream is = jar.getInputStream(jar.getJarEntry(FileConstants.JAR_MANIFEST_ENTRY_NAME));
 			// Use ManifestReader.readManifest(is), since the finally block is crucial for
 			// deleting the locally cloned JAR files after exceptions
 			Map<String, String> headers = ManifestReader.readManifest(is);

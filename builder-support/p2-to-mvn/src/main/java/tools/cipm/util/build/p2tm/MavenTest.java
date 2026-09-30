@@ -23,8 +23,17 @@ public class MavenTest {
 
 	@Test
 	public void testWithMapping() {
-		var mvnDirPath = new File("../../mvn").toPath();
-		var repoPath = new File("../../archive/cipm-0.1.1").getAbsoluteFile().toPath().toAbsolutePath();
+		// Execution path
+		var currentPath = new File("").toPath().toAbsolutePath();
+
+		// The top level directory of the entire GIT repository
+		var topDirPath = currentPath.getParent().getParent();
+
+		// Relative path to local Maven repository
+		var mvnDirPath = currentPath.relativize(topDirPath.resolve("mvn"));
+
+		// Absolute path to the concrete CIPM update site
+		var repoPath = topDirPath.resolve("archive").resolve("cipm-0.1.1").toAbsolutePath();
 
 		// Build the Maven Repository Index
 		MvnRepositoryIndex.build(mvnDirPath);

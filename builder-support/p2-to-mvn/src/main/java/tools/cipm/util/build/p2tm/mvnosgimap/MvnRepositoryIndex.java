@@ -1,5 +1,6 @@
 package tools.cipm.util.build.p2tm.mvnosgimap;
 
+import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -105,7 +106,8 @@ public final class MvnRepositoryIndex {
 		}
 
 		String artifactId = artifactIdDir.getFileName().toString();
-		String groupId = relativeLocalMavenRepoRootPath.relativize(groupPath).toString().replace('/', '.');
+		String groupId = relativeLocalMavenRepoRootPath.relativize(groupPath).toString().replace(File.separatorChar,
+				'.');
 
 		String fileName = jarPath.getFileName().toString();
 		String version = versionDir;
